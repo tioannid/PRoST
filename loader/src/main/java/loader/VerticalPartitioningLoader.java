@@ -58,7 +58,7 @@ public class VerticalPartitioningLoader extends Loader {
 			spark.sql(createVPTableFixed);
 
 			final String populateVPTable = String.format(
-					"INSERT OVERWRITE TABLE %1$s " + "SELECT %2$s, %3$s " + "FROM %4$s WHERE %5$s = '%6$s' ",
+					"INSERT INTO TABLE %1$s " + "SELECT %2$s, %3$s " + "FROM %4$s WHERE %5$s = '%6$s' ",
 					"vp_" + getValidHiveName(property), column_name_subject, column_name_object, name_tripletable,
 					column_name_predicate, property);
 			// Commented code is partitioning by subject

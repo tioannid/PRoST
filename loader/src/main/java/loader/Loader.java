@@ -25,19 +25,19 @@ public abstract class Loader {
 	public String column_name_subject = "s";
 	public String column_name_predicate = "p";
 	public String column_name_object = "o";
-	public String name_tripletable = "tripletable";
+	public String name_tripletable = "triples";
 	protected String[] properties_names;
 	public String stats_file_suffix = ".stats";
 
 	public Loader(final String hdfs_input_directory, final String database_name, final SparkSession spark) {
-		this.database_name = database_name;
+		this.database_name =database_name ;
 		this.spark = spark;
 		this.hdfs_input_directory = hdfs_input_directory;
 		// Configurations (they should be working but they are not in Cloudera). Change hive-site.xml.
-		// spark.sql("SET hive.exec.dynamic.partition = true");
-		// spark.sql("SET hive.exec.dynamic.partition.mode = nonstrict");
-		// spark.sql("SET hive.exec.max.dynamic.partitions = 4000");
-		// spark.sql("SET hive.exec.max.dynamic.partitions.pernode = 2000");
+		 spark.sql("SET hive.exec.dynamic.partition = true");
+		 spark.sql("SET hive.exec.dynamic.partition.mode = nonstrict");
+		 spark.sql("SET hive.exec.max.dynamic.partitions = 4000");
+		 spark.sql("SET hive.exec.max.dynamic.partitions.pernode = 2000");
 
 		// from now on, set the right database
 		useOutputDatabase();
@@ -72,7 +72,7 @@ public abstract class Loader {
 	}
 
 	protected void useOutputDatabase() {
-		spark.sql("CREATE DATABASE IF NOT EXISTS " + database_name);
+		//spark.sql("CREATE DATABASE IF NOT EXISTS " + database_name);
 		spark.sql("USE " + database_name);
 		logger.info("Using the database: " + database_name);
 	}

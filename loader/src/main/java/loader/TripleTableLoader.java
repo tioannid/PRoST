@@ -39,6 +39,7 @@ public class TripleTableLoader extends Loader {
 
 		spark.sql(queryDropTripleTable);
 		spark.sql(queryDropTripleTableFixed);
+		
 
 		final String createTripleTableRaw = String.format(
 				"CREATE EXTERNAL TABLE IF NOT EXISTS %1$s(%2$s STRING, %3$s STRING, %4$s STRING) ROW FORMAT SERDE "
@@ -64,15 +65,18 @@ public class TripleTableLoader extends Loader {
 							+ "PARTITIONED BY (%3$s STRING) STORED AS PARQUET",
 					name_tripletable, column_name_subject, column_name_predicate, column_name_object);
 		}
+		logger.info("create triple table statement: "+createTripleTableFixed);
 		spark.sql(createTripleTableFixed);
-
+		
+		spark.sql("show tables").show();
+		
 		String distinctStatement = "";
 		if (dropDuplicates)
 			distinctStatement = "DISTINCT";
 
 		if (!ttPartitionedBySub && !ttPartitionedByPred) {
 			repairTripleTableFixed = String.format(
-					"INSERT OVERWRITE TABLE %1$s  " + "SELECT " + distinctStatement + " %2$s, %3$s, trim(%4$s)  "
+					"INSERT INTO TABLE %1$s  " + "SELECT " + distinctStatement + " %2$s, %3$s, trim(%4$s)  "
 							+ "FROM %5$s " + "WHERE %2$s is not null AND %3$s is not null AND %4$s is not null AND "
 							+ "NOT(%2$s RLIKE '^\\s*\\.\\s*$')  AND NOT(%3$s RLIKE '^\\s*\\.\\s*$')"
 							+ " AND NOT(%4$s RLIKE '^\\s*\\.\\s*$') AND " + "NOT(%4$s RLIKE '^\\s*<.*<.*>')  "
@@ -88,8 +92,8 @@ public class TripleTableLoader extends Loader {
 							+ "NOT(%2$s RLIKE '^\\s*\\.\\s*$')  "
 							+ "AND NOT(%3$s RLIKE '^\\s*\\.\\s*$') AND NOT(%4$s RLIKE '^\\s*\\.\\s*$') AND "
 							+ "NOT(%4$s RLIKE '^\\s*<.*<.*>')  "
-							+ "AND NOT(%4$s RLIKE '(?<!\\u005C\\u005C)\".*(?<!\\u005C\\u005C)\".*(?<!\\u005C\\u005C)\"') AND "
-							+ "LENGTH(%3$s) < %6$s",
+							+ "AND NOT(%4$s RLIKE '(?<!\\u005C\\u005C)\".*(?<!\\u005C\\u005C)\".*(?<!\\u005C\\u005C)\"') ", //AND "
+							//+ "LENGTH(%3$s) < %6$s",
 					name_tripletable, column_name_subject, column_name_predicate, column_name_object,
 					name_tripletable + "_ext", max_length_col_name);
 		} else if (ttPartitionedByPred) {
@@ -108,7 +112,9 @@ public class TripleTableLoader extends Loader {
 
 		logger.info("Created tripletable with: " + createTripleTableRaw);
 		logger.info("Cleaned tripletable created with: " + repairTripleTableFixed);
-
+		
+		spark.sql("show tables").show();
+		
 		final String queryRawTriples = String.format("SELECT * FROM %s", name_tripletable + "_ext");
 		final String queryAllTriples = String.format("SELECT * FROM %s", name_tripletable);
 		Dataset<Row> allTriples = spark.sql(queryAllTriples);

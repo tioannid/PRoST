@@ -119,7 +119,7 @@ public class Main {
 			logger.info("Input path set to: " + input_location);
 		}
 		if (cmd.hasOption("output")) {
-			outputDB = cmd.getOptionValue("output");
+			outputDB = cmd.getOptionValue("output") ;
 			logger.info("Output database set to: " + outputDB);
 		}
 
@@ -223,7 +223,7 @@ public class Main {
 		// Removing previous instances of the database in case a database with
 		// the same name already exists.
 		// In this case a new database with the same name will be created.
-		spark.sql("DROP DATABASE IF EXISTS " + outputDB + " CASCADE");
+		//spark.sql("DROP DATABASE IF EXISTS " + outputDB + " CASCADE");
 
 		long startTime;
 		long executionTime;
