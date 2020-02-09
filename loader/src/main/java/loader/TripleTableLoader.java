@@ -1,7 +1,14 @@
 package loader;
 
+import java.io.IOException;
 import java.util.List;
 
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.LocatedFileStatus;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.spark.api.java.JavaRDD;
+import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -20,6 +27,7 @@ public class TripleTableLoader extends Loader {
 	protected boolean ttPartitionedBySub = false;
 	protected boolean ttPartitionedByPred = false;
 	protected boolean dropDuplicates = true;
+	protected boolean useRDFLoader = true;
 
 	public TripleTableLoader(final String hdfs_input_directory, final String database_name, final SparkSession spark,
 			final boolean ttPartitionedBySub, final boolean ttPartitionedByPred, final boolean dropDuplicates) {
@@ -28,6 +36,62 @@ public class TripleTableLoader extends Loader {
 		this.ttPartitionedByPred = ttPartitionedByPred;
 		this.dropDuplicates = dropDuplicates;
 	}
+
+	public void parserLoad( String arg)
+	{
+		final String queryDropTripleTable = String.format("DROP TABLE IF EXISTS %s", name_tripletable);
+		final String queryDropTripleTableFixed = String.format("DROP TABLE IF EXISTS %s", name_tripletable);
+
+		spark = SparkSession.builder().appName("JD Word Counter").enableHiveSupport().getOrCreate();
+		spark.sql(queryDropTripleTable);
+		spark.sql(queryDropTripleTableFixed);
+
+
+		String createTripleTableFixed = String.format(
+				"CREATE TABLE  IF NOT EXISTS  %1$s(%2$s STRING, %3$s STRING, %4$s STRING) STORED AS PARQUET",
+				name_tripletable, column_name_subject, column_name_predicate, column_name_object);
+
+		parseDirectory(arg);
+
+	}
+
+	private void parseDirectory(String directory) {
+
+
+		JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(spark.sparkContext());
+		MyParser par = new MyParser();
+		int c = 0;
+		try {
+			RemoteIterator<LocatedFileStatus> i = FileSystem.get(sparkContext.hadoopConfiguration()).listFiles(new Path(directory), false);
+			
+			while (i.hasNext()) {
+				String createTripleTableFixed;
+				Path path = i.next().getPath();
+				JavaRDD<String> inputFile = sparkContext.textFile(path.toString());
+				JavaRDD<RDFStatement> parsedStatements = inputFile.map(line -> par.parseLine(line));
+
+				Dataset<Row> dataset = spark.createDataFrame(parsedStatements, RDFStatement.class);
+				dataset.createOrReplaceTempView("tempTable");
+				if (c == 0) {
+					createTripleTableFixed = String.format(
+							"CREATE TABLE  IF NOT EXISTS %1$s AS SELECT * FROM tempTable", name_tripletable);
+				}
+				else {
+					createTripleTableFixed = String.format(
+							"INSERT INTO %1$s SELECT * FROM tempTable", name_tripletable);
+				}
+				spark.sql(createTripleTableFixed);
+				c++;
+			}
+
+			if (!i.hasNext())
+				return;
+		} catch(IOException e) {
+
+		}
+
+	}
+
 
 	@Override
 	public void load() throws Exception {
@@ -39,7 +103,11 @@ public class TripleTableLoader extends Loader {
 
 		spark.sql(queryDropTripleTable);
 		spark.sql(queryDropTripleTableFixed);
-		
+
+		if (this.useRDFLoader) {
+			parserLoad(hdfs_input_directory);
+			return ;
+		}
 
 		final String createTripleTableRaw = String.format(
 				"CREATE EXTERNAL TABLE IF NOT EXISTS %1$s(%2$s STRING, %3$s STRING, %4$s STRING) ROW FORMAT SERDE "
@@ -49,6 +117,7 @@ public class TripleTableLoader extends Loader {
 				name_tripletable + "_ext", column_name_subject, column_name_predicate, column_name_object,
 				hdfs_input_directory);
 		spark.sql(createTripleTableRaw);
+
 
 		if (!ttPartitionedBySub && !ttPartitionedByPred) {
 			createTripleTableFixed = String.format(
