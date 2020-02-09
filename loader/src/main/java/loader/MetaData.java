@@ -34,7 +34,7 @@ public class MetaData {
     }
 
     public void generateMetaData() {
-        String vpTableName = dbname+this.tableName;
+        String vpTableName = dbname+'.'+this.tableName;
 
         final String queryDropTripleTable = String.format("DROP TABLE IF EXISTS %s", vpTableName);
         spark.sql(queryDropTripleTable);
@@ -62,10 +62,10 @@ public class MetaData {
             long distinctObjects = dd.first().getLong(1);
 
             query = String.format(
-                "INSERT INTO %1$s VALUES( %2$s, %3$s, %4$s )",
+                "INSERT INTO %1$s VALUES( '%2$s', %3$s, %4$s )",
                 vpTableName, table, distinctSubjects, distinctObjects);
             System.out.println(query);
-            //spark.sql(query);
+            spark.sql(query);
             
         }
         
