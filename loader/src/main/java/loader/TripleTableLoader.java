@@ -13,6 +13,7 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 
+
 /**
  * Class that constructs a triples table. First, the loader creates an external
  * table ("raw"). The data is read using SerDe capabilities and by means of a
@@ -28,6 +29,7 @@ public class TripleTableLoader extends Loader {
 	protected boolean ttPartitionedByPred = false;
 	protected boolean dropDuplicates = true;
 	protected boolean useRDFLoader = true;
+	protected boolean onlyGenerateMetadata = true;
 
 	public TripleTableLoader(final String hdfs_input_directory, final String database_name, final SparkSession spark,
 			final boolean ttPartitionedBySub, final boolean ttPartitionedByPred, final boolean dropDuplicates) {
@@ -104,6 +106,12 @@ public class TripleTableLoader extends Loader {
 		spark.sql(queryDropTripleTable);
 		spark.sql(queryDropTripleTableFixed);
 
+		if (this.onlyGenerateMetadata) {
+			MetaData md = new MetaData(spark);
+			md.generateMetaData();
+			return ;
+
+		}
 		if (this.useRDFLoader) {
 			parserLoad(hdfs_input_directory);
 			return ;
