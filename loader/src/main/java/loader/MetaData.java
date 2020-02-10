@@ -52,7 +52,7 @@ public class MetaData {
         for (int i=0; i < listofTables.size()-1; i++) {
             String table = listofTables.get(i).getString(1);
             System.out.println(table);
-            if (!table.startsWith("vp"))
+            if (!table.startsWith("vp_"))
                 continue;
 
             String query = String.format("SELECT COUNT(DISTINCT s),COUNT(DISTINCT o) FROM prost_test.%s", table);
@@ -62,7 +62,7 @@ public class MetaData {
             long distinctObjects = dd.first().getLong(1);
 
             query = String.format(
-                "INSERT INTO %1$s VALUES( '%2$s', %3$s, %4$s )",
+                "INSERT INTO %1$s VALUES( \"%2$s\", %3$s, %4$s )",
                 vpTableName, table, distinctSubjects, distinctObjects);
             System.out.println(query);
             spark.sql(query);
