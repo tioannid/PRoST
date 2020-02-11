@@ -106,12 +106,11 @@ public class TripleTableLoader extends Loader {
 		spark.sql(queryDropTripleTable);
 		spark.sql(queryDropTripleTableFixed);
 
-		if (this.onlyGenerateMetadata) {
-			MetaData md = new MetaData(spark);
-			md.generateMetaData();
-			return ;
-
-		}
+//		if (this.onlyGenerateMetadata) {
+//			MetaData md = new MetaData(spark);
+//			md.generateMetaData();
+//			return ;
+//		}
 		if (this.useRDFLoader) {
 			parserLoad(hdfs_input_directory);
 			return ;

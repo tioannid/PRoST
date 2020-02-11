@@ -1,7 +1,17 @@
 package loader;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.log4j.Logger;
 import org.apache.spark.sql.SparkSession;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Scanner;
 
 /**
  * This abstract class define the parameters and methods for loading an RDF graph into HDFS using Spark SQL.
@@ -75,6 +85,25 @@ public abstract class Loader {
 		//spark.sql("CREATE DATABASE IF NOT EXISTS " + database_name);
 		spark.sql("USE " + database_name);
 		logger.info("Using the database: " + database_name);
+	}
+
+	public static HashMap<String, String> parseCSVDictionary(String fileName) throws FileNotFoundException, IOException {
+		FileSystem fs = FileSystem.get(new Configuration());
+		FSDataInputStream in = fs.open(new Path(fileName));
+
+		Scanner scanner = new Scanner(in);
+		scanner.useDelimiter(",");
+
+		HashMap<String, String> map = new HashMap<>();
+
+		while (scanner.hasNext()) {
+			String key = scanner.next();
+			String value = scanner.next();
+			map.put(key, value);
+
+		}
+		scanner.close();
+		return map;
 	}
 
 }

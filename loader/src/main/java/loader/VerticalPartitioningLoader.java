@@ -1,9 +1,6 @@
 package loader;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -18,6 +15,12 @@ import org.apache.spark.sql.SparkSession;
 import loader.ProtobufStats.Graph;
 import loader.ProtobufStats.TableStats;
 
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 /**
  * Build the VP, i.e. a table for each predicate.
  *
@@ -27,6 +30,7 @@ import loader.ProtobufStats.TableStats;
  */
 public class VerticalPartitioningLoader extends Loader {
 	private final boolean computeStatistics;
+	final static String dict_file_name = "hdfs:///Projects/prost_test/Resources/dictionary.csv";
 
 	public VerticalPartitioningLoader(final String hdfs_input_directory, final String database_name,
 			final SparkSession spark, final boolean computeStatistics) {
@@ -40,6 +44,11 @@ public class VerticalPartitioningLoader extends Loader {
 
 		if (properties_names == null) {
 			properties_names = extractProperties();
+		}
+		try {
+			generatePredicateDictionary();
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
 
 		final Vector<TableStats> tables_stats = new Vector<>();
@@ -88,7 +97,11 @@ public class VerticalPartitioningLoader extends Loader {
 		}
 
 		logger.info("Vertical Partitioning completed. Loaded " + String.valueOf(properties_names.length) + " tables.");
-
+		try {
+			Loader.parseCSVDictionary(dict_file_name);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 
 	/*
@@ -201,5 +214,24 @@ public class VerticalPartitioningLoader extends Loader {
 		}
 		return false;
 	}
+	/** Additions by D Halatsis
+	 * Create a csv file that contains predicates and their new names
+	*/
+	private void generatePredicateDictionary() throws IOException{
+		if (properties_names == null) {
+			properties_names = extractProperties();
+		}
+		Configuration conf = new Configuration();
+		FileSystem fs = FileSystem.get(conf);
+		FSDataOutputStream out = fs.create(new Path(dict_file_name));
+
+		for (int i=0; i < properties_names.length; i++) {
+			String fmt = String.format("%1$s\tp%2$s\n", properties_names[i], i+"");
+			byte[] bytes = fmt.getBytes();
+			out.write(fmt.getBytes(), 0, bytes.length);
+		}
+		out.close();
+	}
+
 
 }
