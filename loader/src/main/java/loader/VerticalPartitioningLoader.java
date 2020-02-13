@@ -30,12 +30,14 @@ import org.apache.hadoop.fs.Path;
  */
 public class VerticalPartitioningLoader extends Loader {
 	private final boolean computeStatistics;
+	private final boolean generateMetadata;
 	final static String dict_file_name = "hdfs:///Projects/prost_test/Resources/dictionary.csv";
 
 	public VerticalPartitioningLoader(final String hdfs_input_directory, final String database_name,
 			final SparkSession spark, final boolean computeStatistics) {
 		super(hdfs_input_directory, database_name, spark);
 		this.computeStatistics = computeStatistics;
+		this.generateMetadata = true;
 	}
 
 	@Override
@@ -94,6 +96,14 @@ public class VerticalPartitioningLoader extends Loader {
 		// save the stats in a file with the same name as the output database
 		if (computeStatistics) {
 			save_stats(database_name, tables_stats);
+		}
+		if (this.generateMetadata) {
+			try {
+				MetaData md = new MetaData(spark);
+				md.generateMetaData();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 		}
 
 		logger.info("Vertical Partitioning completed. Loaded " + String.valueOf(properties_names.length) + " tables.");
@@ -226,7 +236,7 @@ public class VerticalPartitioningLoader extends Loader {
 		FSDataOutputStream out = fs.create(new Path(dict_file_name));
 
 		for (int i=0; i < properties_names.length; i++) {
-			String fmt = String.format("%1$s\tp%2$s\n", properties_names[i], i+"");
+			String fmt = String.format("%1$s,p%2$s\n", properties_names[i], i+"");
 			byte[] bytes = fmt.getBytes();
 			out.write(fmt.getBytes(), 0, bytes.length);
 		}

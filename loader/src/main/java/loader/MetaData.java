@@ -1,12 +1,12 @@
 package loader;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Scanner;
 
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.LocatedFileStatus;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.*;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Dataset;
@@ -28,22 +28,21 @@ public class MetaData {
     protected String distinct_objects_column = "do";
     protected String distinct_subjects_column = "ds";
 
+    final private String metadata_file_name = "hdfs:///Projects/prost_test/Resources/vp_metadata.csv";
+
 
     public MetaData(final SparkSession spark) {
         this.spark = spark;
     }
 
-    public void generateMetaData() {
+    public void generateMetaData() throws IOException{
         String vpTableName = dbname+'.'+this.tableName;
 
-        final String queryDropTripleTable = String.format("DROP TABLE IF EXISTS %s", vpTableName);
-        spark.sql(queryDropTripleTable);
 
-        String createMetaDataTable = String.format(
-            "CREATE TABLE IF NOT EXISTS %1$s(%2$s STRING, %3$s INT, %4$s INT)", vpTableName,
-            table_name_column, distinct_subjects_column, distinct_objects_column);
-        spark.sql(createMetaDataTable);
 
+        Configuration conf = new Configuration();
+        FileSystem fs = FileSystem.get(conf);
+        FSDataOutputStream out = fs.create(new Path(metadata_file_name));
 
 
         //discover tables here
@@ -61,17 +60,43 @@ public class MetaData {
             long distinctSubjects = dd.first().getLong(0);
             long distinctObjects = dd.first().getLong(1);
 
-            query = String.format(
-                "INSERT INTO %1$s VALUES( \"%2$s\", %3$s, %4$s )",
-                vpTableName, table, distinctSubjects, distinctObjects);
-            System.out.println(query);
-            spark.sql(query);
-            
-        }
-        
 
-        //print the results to see that they are correct
-        spark.sql("select * from "+vpTableName).show();
+            String fmt = String.format("%1$s,%2$s,%3$s\n", table, distinctSubjects, distinctObjects);
+            byte[] bytes = fmt.getBytes();
+            out.write(fmt.getBytes(), 0, bytes.length);
+
+        }
+        out.close();
+
+
+
+
+    }
+
+    public HashMap<String,  String[]> parseMetadata() throws IOException{
+        FileSystem fs = FileSystem.get(new Configuration());
+        FSDataInputStream in = fs.open(new Path(metadata_file_name));
+
+        Scanner scanner = new Scanner(in);
+        scanner.useDelimiter(",");
+
+        HashMap<String, String[]> map = new HashMap<>();
+
+        while (scanner.hasNext()) {
+            String key = scanner.next();
+            String value1 = scanner.next();
+            String value2 = scanner.next();
+            map.put(key, new String[]{value1, value2});
+
+        }
+        scanner.close();
+
+        //print the map
+        for (String key : map.keySet()) {
+            String val = map.get(key).toString();
+            System.out.println(val);
+        }
+        return map;
 
     }
 
