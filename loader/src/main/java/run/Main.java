@@ -134,11 +134,11 @@ public class Main {
 		}
 		if (cmd.hasOption("statisticsfile")) {
 			statFile= cmd.getOptionValue("statisticsfile") ;
-			logger.info("Output database set to: " + statFile);
+			logger.info("Statistics file: " + statFile);
 		}
 		if (cmd.hasOption("dictionaryfile")) {
 			dictionaryFile= cmd.getOptionValue("dictionaryfile") ;
-			logger.info("Output database set to: " + dictionaryFile);
+			logger.info("Dictionary file: " + dictionaryFile);
 		}
 
 		// default if a logical partition is not specified is: TT, WPT, and VP.
