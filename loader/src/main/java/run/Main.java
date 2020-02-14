@@ -48,6 +48,8 @@ public class Main {
 	private static boolean ttPartitionedByPred = false;
 	private static boolean ttPartitionedBySub = false;
 	private static boolean wptPartitionedBySub = false;
+	private static String statFile;
+	private static String dictionaryFile;
 
 	public static void main(final String[] args) throws Exception {
 		final InputStream inStream = Main.class.getClassLoader().getResourceAsStream(loj4jFileName);
@@ -68,6 +70,14 @@ public class Main {
 		final Option outputOpt = new Option("o", "output", true, "Output database name.");
 		outputOpt.setRequired(true);
 		options.addOption(outputOpt);
+		
+		final Option statFileOpt = new Option("sf", "statisticsfile", true, "Statistics Filename.");
+		statFileOpt.setRequired(true);
+		options.addOption(statFileOpt);
+		
+		final Option dictFileOpt = new Option("df", "dictionaryfile", true, "Dictionary Filename.");
+		dictFileOpt.setRequired(true);
+		options.addOption(dictFileOpt);
 
 		final Option lpOpt = new Option("lp", "logicalPartitionStrategies", true, "Logical Partition Strategy.");
 		lpOpt.setRequired(false);
@@ -121,6 +131,14 @@ public class Main {
 		if (cmd.hasOption("output")) {
 			outputDB = cmd.getOptionValue("output") ;
 			logger.info("Output database set to: " + outputDB);
+		}
+		if (cmd.hasOption("statisticsfile")) {
+			statFile= cmd.getOptionValue("statisticsfile") ;
+			logger.info("Output database set to: " + statFile);
+		}
+		if (cmd.hasOption("dictionaryfile")) {
+			dictionaryFile= cmd.getOptionValue("dictionaryfile") ;
+			logger.info("Output database set to: " + dictionaryFile);
 		}
 
 		// default if a logical partition is not specified is: TT, WPT, and VP.
@@ -267,7 +285,8 @@ public class Main {
 		if (generateVP) {
 			startTime = System.currentTimeMillis();
 			final VerticalPartitioningLoader vp_loader =
-					new VerticalPartitioningLoader(input_location, outputDB, spark, useStatistics);
+					new VerticalPartitioningLoader(input_location, outputDB, spark, useStatistics, statFile,
+							dictionaryFile);
 			vp_loader.load();
 			executionTime = System.currentTimeMillis() - startTime;
 			logger.info("Time in ms to build the Vertical partitioning: " + String.valueOf(executionTime));
