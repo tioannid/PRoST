@@ -44,12 +44,14 @@ public class Main {
 	private static boolean generateVP = false;
 	private static boolean generateIWPT = false;
 	private static boolean generateJWPT = false;
+	private static boolean generateExtVP = false;
 	// options for physical partitioning
 	private static boolean ttPartitionedByPred = false;
 	private static boolean ttPartitionedBySub = false;
 	private static boolean wptPartitionedBySub = false;
 	private static String statFile;
 	private static String dictionaryFile;
+	private static double thresholdExtVP = 0.25;
 
 	public static void main(final String[] args) throws Exception {
 		final InputStream inStream = Main.class.getClassLoader().getResourceAsStream(loj4jFileName);
@@ -191,6 +193,15 @@ public class Main {
 				logger.info("Logical strategy used: JWPT");
 				generateJWPT = true;
 			}
+			if (strategies.contains("EXTVP")) {
+				if (generateTT == false) {
+					generateTT = true;
+					logger.info("Logical strategy activated: TT (mandatory for VP) with default physical partitioning");
+				}
+				generateVP = true;
+				generateExtVP =  true;
+				logger.info("Logical strategy used: VP");
+			}
 		}
 
 		// Relevant for physical partitioning
@@ -286,7 +297,7 @@ public class Main {
 			startTime = System.currentTimeMillis();
 			final VerticalPartitioningLoader vp_loader =
 					new VerticalPartitioningLoader(input_location, outputDB, spark, useStatistics, statFile,
-							dictionaryFile);
+							dictionaryFile, generateExtVP, thresholdExtVP);
 			vp_loader.load();
 			executionTime = System.currentTimeMillis() - startTime;
 			logger.info("Time in ms to build the Vertical partitioning: " + String.valueOf(executionTime));
