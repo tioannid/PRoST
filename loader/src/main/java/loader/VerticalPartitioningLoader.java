@@ -72,11 +72,14 @@ public class VerticalPartitioningLoader extends Loader {
 		try {
 			spark.sql("DROP TABLE IF EXISTS geometries");
 			Dataset<Row> geometries = spark.sql("Select g.s as entity, ifnull(w.s, g.o) as geom, w.o as wkt from "
-					+ predDictionary.get("http://www.opengis.net/ont/geosparql#asWKT") + " w full outer join "
-					+ predDictionary.get("http://www.opengis.net/ont/geosparql#hasGeometry") + " g on g.o=w.s");
+					+ " (select * from triples where p='http://www.opengis.net/ont/geosparql#asWKT') w full outer join"
+					+ " (select * from triples where p='http://www.opengis.net/ont/geosparql#hasGeometry') g on "
+					+ " g.o=w.s");
 			geometries.write().saveAsTable("geometries");
 			//put as stats for geometries table the hasGeometry stats
-			statistics.put("geometries", statistics.get(predDictionary.get("http://www.opengis.net/ont/geosparql#hasGeometry")));
+			long rows=geometries.count();
+			TableInfo tblInfo = new TableInfo(rows, rows, rows);
+			statistics.put("geometries", tblInfo);
 		} catch (Exception e) {
 			geometriesCreated=false;
 			logger.error("Could not create geometries table: " + e.getMessage());
@@ -105,7 +108,7 @@ public class VerticalPartitioningLoader extends Loader {
 			 * , "vp_" + this.getValidHiveName(property), column_name_subject,
 			 * column_name_object);
 			 */
-			spark.sql(createVPTableFixed);
+			//spark.sql(createVPTableFixed);
 
 			final String populateVPTable = String.format(
 					"INSERT INTO TABLE %1$s " + "SELECT %2$s, %3$s " + "FROM %4$s WHERE %5$s = '%6$s' ", property,
@@ -119,10 +122,15 @@ public class VerticalPartitioningLoader extends Loader {
 			 * column_name_subject, column_name_object, name_tripletable,
 			 * column_name_predicate, property);
 			 */
-			spark.sql(populateVPTable);
+			//spark.sql(populateVPTable);
+			final String selectVPTable = String.format(
+					"SELECT %1$s, %2$s " + "FROM %3$s WHERE %4$s = '%5$s' ", column_name_subject, column_name_object, name_tripletable, column_name_predicate,
+					properties_names[i]);
+			
 
 			// calculate stats
-			final Dataset<Row> table_VP = spark.sql("SELECT * FROM " + property);
+			final Dataset<Row> table_VP = spark.sql(selectVPTable);
+			table_VP.write().saveAsTable(property);
 
 			if (computeStatistics) {
 				statistics.put(property, calculate_stats_table(table_VP, property));
@@ -138,6 +146,11 @@ public class VerticalPartitioningLoader extends Loader {
 		
 		List<String> tablesWithIRIs = new ArrayList<String>();
 		for(String tbl:extractPredicatesWithIRIObjects()) {
+			if(tbl.equals("http://www.opengis.net/ont/geosparql#hasGeometry") ||
+					tbl.equals("http://www.opengis.net/ont/geosparql#asWKT")) {
+				//what to do?
+				continue;
+			}
 			tablesWithIRIs.add(predDictionary.get(tbl));
 		}
 		try {
@@ -197,9 +210,9 @@ public class VerticalPartitioningLoader extends Loader {
 	private TableInfo calculate_stats_table(final Dataset<Row> table, final String tableName) {
 
 		// calculate the stats
-		final int table_size = (int) table.count();
-		final int distinct_subjects = (int) table.select(column_name_subject).distinct().count();
-		final int distinct_objects = (int) table.select(column_name_object).distinct().count();
+		final long table_size =  table.count();
+		final long distinct_subjects =  table.select(column_name_subject).distinct().count();
+		final long distinct_objects =  table.select(column_name_object).distinct().count();
 		logger.info("table:" + tableName + " has " + table_size + " rows");
 		TableInfo tblInfo = new TableInfo(table_size, distinct_subjects, distinct_objects);
 

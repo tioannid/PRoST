@@ -2,32 +2,32 @@ package loader;
 
 public class TableInfo {
 	
-	private int countAll;
-	private int distinctSubjects;
-	private int distinctObjects;
+	private long countAll;
+	private long distinctSubjects;
+	private long distinctObjects;
 	
 	
 	
 	
-	public TableInfo(int countAll, int distinctSubjects, int distinctObjects) {
+	public TableInfo(long rows, long rows2, long rows3) {
 		super();
-		this.countAll = countAll;
-		this.distinctSubjects = distinctSubjects;
-		this.distinctObjects = distinctObjects;
+		this.countAll = rows;
+		this.distinctSubjects = rows2;
+		this.distinctObjects = rows3;
 	}
-	public int getCountAll() {
+	public long getCountAll() {
 		return countAll;
 	}
 	public void setCountAll(int countAll) {
 		this.countAll = countAll;
 	}
-	public int getDistinctSubjects() {
+	public long getDistinctSubjects() {
 		return distinctSubjects;
 	}
 	public void setDistinctSubjects(int distinctSubjects) {
 		this.distinctSubjects = distinctSubjects;
 	}
-	public int getDistinctObjects() {
+	public long getDistinctObjects() {
 		return distinctObjects;
 	}
 	public void setDistinctObjects(int distinctObjects) {

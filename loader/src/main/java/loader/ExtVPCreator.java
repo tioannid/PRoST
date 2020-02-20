@@ -55,6 +55,12 @@ public class ExtVPCreator {
 			List<String> relatedPredicates = getRelatedPredicates(pred1, relType);
 
 			for (String pred2iri : relatedPredicates) {
+				if(pred2iri.equals("http://www.opengis.net/ont/geosparql#hasGeometry") ||
+						pred2iri.equals("http://www.opengis.net/ont/geosparql#asWKT")) {
+					//what to do?
+					continue;
+				}
+				
 				String pred2=predDictionary.get(pred2iri);
 				if(relType == "SO" && (!tablesWithIRIs.contains(pred2) || pred2iri.equals("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"))) {
 					//objects in pred2 are literals or rdf:type values, nothing to do
