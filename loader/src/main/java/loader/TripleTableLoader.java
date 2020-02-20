@@ -1,7 +1,9 @@
 package loader;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
@@ -30,6 +32,7 @@ public class TripleTableLoader extends Loader {
 	protected boolean dropDuplicates = true;
 	protected boolean useRDFLoader = true;
 	protected boolean onlyGenerateMetadata = true;
+	
 
 	public TripleTableLoader(final String hdfs_input_directory, final String database_name, final SparkSession spark,
 			final boolean ttPartitionedBySub, final boolean ttPartitionedByPred, final boolean dropDuplicates) {
@@ -37,6 +40,7 @@ public class TripleTableLoader extends Loader {
 		this.ttPartitionedBySub = ttPartitionedBySub;
 		this.ttPartitionedByPred = ttPartitionedByPred;
 		this.dropDuplicates = dropDuplicates;
+		
 	}
 
 	public void parserLoad( String arg)
@@ -54,11 +58,13 @@ public class TripleTableLoader extends Loader {
 				name_tripletable, column_name_subject, column_name_predicate, column_name_object);
 
 		parseDirectory(arg);
+		
+		
 
 	}
 
 	private void parseDirectory(String directory) {
-
+		
 
 		JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(spark.sparkContext());
 		MyParser par = new MyParser();
@@ -271,4 +277,7 @@ public class TripleTableLoader extends Loader {
 		final List<Row> cleanedList = allTriples.limit(10).collectAsList();
 		logger.info("First 10 cleaned triples (less if there are less): " + cleanedList);
 	}
+
+
+	
 }

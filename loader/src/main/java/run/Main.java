@@ -4,6 +4,7 @@ import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -247,7 +248,9 @@ public class Main {
 		}
 
 		// Set the loader from the inputFile to the outputDB
-		final SparkSession spark = SparkSession.builder().appName("PRoST-Loader").enableHiveSupport().getOrCreate();
+		final SparkSession spark = SparkSession.builder().appName("PRoST-Loader")
+				//.master("local[*]")
+				.enableHiveSupport().getOrCreate();
 
 		// Removing previous instances of the database in case a database with
 		// the same name already exists.
@@ -256,12 +259,14 @@ public class Main {
 
 		long startTime;
 		long executionTime;
+		
 
 		if (generateTT) {
 			startTime = System.currentTimeMillis();
 			final TripleTableLoader tt_loader = new TripleTableLoader(input_location, outputDB, spark,
 					ttPartitionedBySub, ttPartitionedByPred, dropDuplicates);
 			tt_loader.load();
+			
 			executionTime = System.currentTimeMillis() - startTime;
 			logger.info("Time in ms to build the Tripletable: " + String.valueOf(executionTime));
 		}

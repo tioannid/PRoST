@@ -34,6 +34,7 @@ public abstract class Loader {
 	public String line_terminator = "\\n";
 	public String column_name_subject = "s";
 	public String column_name_predicate = "p";
+	public String column_name_object_type = "OType";
 	public String column_name_object = "o";
 	public String name_tripletable = "triples";
 	protected String[] properties_names;

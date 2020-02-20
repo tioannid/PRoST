@@ -1,9 +1,11 @@
 package loader;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.log4j.Logger;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
@@ -18,9 +20,11 @@ public class ExtVPCreator {
 	private int savedTables;
 	private int unsavedTables;
 	private StringBuffer extVPStats;
+	private List<String> tablesWithIRIs;
+	protected static final Logger logger = Logger.getLogger("PRoST");
 
 	public ExtVPCreator(Map<String, String> predDictionary, SparkSession spark, double threshold,
-			Map<String, TableInfo> statistics) {
+			Map<String, TableInfo> statistics, List<String> tablesWithIRIs2) {
 		this.predDictionary = predDictionary;
 		this.spark = spark;
 		this.threshold = threshold;
@@ -28,6 +32,7 @@ public class ExtVPCreator {
 		savedTables = 0;
 		unsavedTables = 0;
 		extVPStats = new StringBuffer();
+		this.tablesWithIRIs=tablesWithIRIs2;
 	}
 
 	public void createExtVP(String relType) {
@@ -37,7 +42,13 @@ public class ExtVPCreator {
 
 		// for every VP table generate a set of ExtVP tables, which represent its
 		// (relType)-relations to the other VP tables
-		for (String pred1 : predDictionary.values()) {
+		for (String propIri : predDictionary.keySet()) {
+			String pred1=predDictionary.get(propIri);
+			if(relType == "OS" && (!tablesWithIRIs.contains(pred1)||  propIri.equals("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"))) {
+				//objects in pred1 are literals or rdf:type values, nothing to do
+				logger.info("skipping OS extVP for property: "+propIri);
+				continue;
+			}
 
 			// get all predicates, whose TPs are in (relType)-relation with TP
 			// (?x, pred1, ?y)
@@ -45,6 +56,10 @@ public class ExtVPCreator {
 
 			for (String pred2iri : relatedPredicates) {
 				String pred2=predDictionary.get(pred2iri);
+				if(relType == "SO" && (!tablesWithIRIs.contains(pred2) || pred2iri.equals("http://www.w3.org/1999/02/22-rdf-syntax-ns#type"))) {
+					//objects in pred2 are literals or rdf:type values, nothing to do
+					continue;
+				}
 				long extVpTableSize = -1L;
 
 				// we avoid generation of ExtVP tables corresponding to subject-subject
@@ -55,13 +70,14 @@ public class ExtVPCreator {
 					Dataset<Row> extVpTable = spark.sql(sqlCommand);
 					extVpTable.registerTempTable("extvp_table");
 					// cache table to avoid recomputation of DF by storage to HDFS
-					extVpTable.cache();
+					//extVpTable.cache();
 					// spark.catalog.cacheTable("extvp_table");
 					extVpTableSize = extVpTable.count();
 
 					// save ExtVP table in case if its size smaller than
 					// ScaleUB*size(corresponding VPTable)
 					if (extVpTableSize < (statistics.get(pred1).getCountAll() * threshold)) {
+						spark.sql("DROP TABLE IF EXISTS "+(relType + pred1 + pred2));
 						extVpTable.write().saveAsTable(relType + pred1 + pred2);
 
 						savedTables++;
@@ -69,7 +85,7 @@ public class ExtVPCreator {
 						unsavedTables++;
 					}
 
-					extVpTable.unpersist();
+					//extVpTable.unpersist();
 					// _spark.catalog.uncacheTable("extvp_table")
 
 				} else {

@@ -1,6 +1,7 @@
 package loader;
 
 import java.io.*;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -11,6 +12,7 @@ import java.util.Set;
 import java.util.Vector;
 
 import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 
@@ -37,6 +39,7 @@ public class VerticalPartitioningLoader extends Loader {
 	private boolean generateExtVP;
 	private double threshold;
 
+
 	public VerticalPartitioningLoader(final String hdfs_input_directory, final String database_name,
 			final SparkSession spark, final boolean computeStatistics, final String statisticsfile,
 			final String dictionaryfile, boolean generateExtVP, double thresholdExtVP) {
@@ -47,7 +50,7 @@ public class VerticalPartitioningLoader extends Loader {
 		this.dict_file_name = dictionaryfile;
 		this.metadata_file_name = statisticsfile;
 		this.generateExtVP = generateExtVP;
-		this.threshold = thresholdExtVP;
+		this.threshold = thresholdExtVP;		
 	}
 
 	@Override
@@ -106,17 +109,11 @@ public class VerticalPartitioningLoader extends Loader {
 			logger.info("First 3 rows sampled (or less if there are less): " + sampledRowsList);
 		}
 
-		// save the stats in a file with the same name as the output database
-		if (computeStatistics) {
-			try {
-				save_stats();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}
+		
 
 		// what happens if asWKT or hasGeometry does not exists?
 		try {
+			spark.sql("DROP TABLE IF EXISTS geometries");
 			Dataset<Row> geometries = spark.sql("Select g.s as entity, ifnull(w.s, g.o) as geom, w.o as wkt from "
 					+ predDictionary.get("http://www.opengis.net/ont/geosparql#asWKT") + " w full outer join "
 					+ predDictionary.get("http://www.opengis.net/ont/geosparql#hasGeometry") + " g on g.o=w.s");
@@ -126,16 +123,41 @@ public class VerticalPartitioningLoader extends Loader {
 		} catch (Exception e) {
 			logger.error("Could not create geometries table: " + e.getMessage());
 		}
+		
+		List<String> tablesWithIRIs = new ArrayList<String>();
+		for(String tbl:extractPredicatesWithIRIObjects()) {
+			tablesWithIRIs.add(predDictionary.get(tbl));
+		}
+		try {
+			logger.info("Saving Information about tables with IRIs or Literals as objects");
+			save_to_file(tablesWithIRIs.toString().getBytes(), metadata_file_name + "-tablesWithIRIs.txt");
+			//save_to_file(this.tablesWithLiterals.toString().getBytes(), metadata_file_name + "-tablesWithLiterals.txt");
+		} catch (Exception e) {
+			logger.error("Could not save Information about tables with IRIs or Literals as objects: " + e.getMessage());
+		}
+		
+		// save the stats in a file with the same name as the output database
+				if (computeStatistics) {
+					try {
+						save_stats();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
 
 		logger.info("Vertical Partitioning completed. Loaded " + String.valueOf(properties_names.length) + " tables.");
 
 		if (generateExtVP) {
-			ExtVPCreator extvp = new ExtVPCreator(predDictionary, spark, threshold, statistics);
+			ExtVPCreator extvp = new ExtVPCreator(predDictionary, spark, threshold, statistics, tablesWithIRIs);
+			logger.info("Creating SS ExtVP");
 			extvp.createExtVP("SS");
+			logger.info("Creating SO ExtVP");
 			extvp.createExtVP("SO");
+			logger.info("Creating OS ExtVP");
 			extvp.createExtVP("OS");
 			try {
-				save_extvp_stats(extvp.getExtVPStats());
+				logger.info("Saving ExtVP Statistics");
+				save_to_file(extvp.getExtVPStats().toString().getBytes(), metadata_file_name + ".ext");
 			} catch (Exception e) {
 				logger.error("Could not save ExtVP statistics: " + e.getMessage());
 			}
@@ -144,6 +166,15 @@ public class VerticalPartitioningLoader extends Loader {
 		 * try { Loader.parseCSVDictionary(dict_file_name); } catch (IOException e) {
 		 * e.printStackTrace(); }
 		 */
+		
+		logger.info("properties with objects that are IRIs: "+tablesWithIRIs.toString());
+		//logger.info("properties with objects that are literals: "+tablesWithLiterals.toString());
+
+		/*Set<String> intersection = new HashSet<String>(tablesWithIRIs); // use the copy constructor
+		intersection.retainAll(tablesWithLiterals);
+		if(!intersection.isEmpty()) {
+			logger.error("properties that have both IRIs and literals as objects: "+intersection.toString());
+		}*/
 	}
 
 	/*
@@ -182,12 +213,11 @@ public class VerticalPartitioningLoader extends Loader {
 
 	}
 
-	private void save_extvp_stats(StringBuffer sb) throws IllegalArgumentException, IOException {
-		logger.info("Saving ExtVP Statistics");
+	private void save_to_file(byte[] bs, String filename) throws IllegalArgumentException, IOException {
 		Configuration conf = new Configuration();
 		FileSystem fs = FileSystem.get(conf);
-		FSDataOutputStream out = fs.create(new Path(metadata_file_name + ".ext"));
-		out.write(sb.toString().getBytes());
+		FSDataOutputStream out = fs.create(new Path(filename));
+		out.write(bs);
 		out.close();
 
 	}
@@ -210,6 +240,13 @@ public class VerticalPartitioningLoader extends Loader {
 		logger.info("Final number of distinct predicates: " + cleanedPropertiesList.size());
 		return cleanedProperties;
 	}
+	
+	private List<String> extractPredicatesWithIRIObjects() {
+		String sql="select distinct " +column_name_predicate+" from "+
+				name_tripletable + " where " + column_name_object_type +" = 2 ";
+		return spark.sql(sql).as(Encoders.STRING()).collectAsList();
+	}
+	
 
 	private String[] handleCaseInsPred(final String[] properties) {
 		final Set<String> seenPredicates = new HashSet<>();
