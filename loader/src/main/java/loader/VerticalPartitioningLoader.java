@@ -65,8 +65,32 @@ public class VerticalPartitioningLoader extends Loader {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+		
+		
+		boolean geometriesCreated=true;
+		// what happens if asWKT or hasGeometry does not exists?
+		try {
+			spark.sql("DROP TABLE IF EXISTS geometries");
+			Dataset<Row> geometries = spark.sql("Select g.s as entity, ifnull(w.s, g.o) as geom, w.o as wkt from "
+					+ predDictionary.get("http://www.opengis.net/ont/geosparql#asWKT") + " w full outer join "
+					+ predDictionary.get("http://www.opengis.net/ont/geosparql#hasGeometry") + " g on g.o=w.s");
+			geometries.write().saveAsTable("geometries");
+			//put as stats for geometries table the hasGeometry stats
+			statistics.put("geometries", statistics.get(predDictionary.get("http://www.opengis.net/ont/geosparql#hasGeometry")));
+		} catch (Exception e) {
+			geometriesCreated=false;
+			logger.error("Could not create geometries table: " + e.getMessage());
+		}
+		
 
 		for (int i = 0; i < properties_names.length; i++) {
+			if(geometriesCreated && 
+					(properties_names[i].equals("http://www.opengis.net/ont/geosparql#asWKT") || 
+							properties_names[i].equals("http://www.opengis.net/ont/geosparql#hasGeometry")	)) {
+				//we do not have to create the VP table
+				predDictionary.remove(properties_names[i]);
+				continue;
+			}
 			final String property = this.predDictionary.get(properties_names[i]);
 			final String queryDropVPTableFixed = String.format("DROP TABLE IF EXISTS %s", property);
 			spark.sql(queryDropVPTableFixed);
@@ -110,19 +134,7 @@ public class VerticalPartitioningLoader extends Loader {
 		}
 
 		
-
-		// what happens if asWKT or hasGeometry does not exists?
-		try {
-			spark.sql("DROP TABLE IF EXISTS geometries");
-			Dataset<Row> geometries = spark.sql("Select g.s as entity, ifnull(w.s, g.o) as geom, w.o as wkt from "
-					+ predDictionary.get("http://www.opengis.net/ont/geosparql#asWKT") + " w full outer join "
-					+ predDictionary.get("http://www.opengis.net/ont/geosparql#hasGeometry") + " g on g.o=w.s");
-			geometries.write().saveAsTable("geometries");
-			//put as stats for geometries table the hasGeometry stats
-			statistics.put("geometries", statistics.get(predDictionary.get("http://www.opengis.net/ont/geosparql#hasGeometry")));
-		} catch (Exception e) {
-			logger.error("Could not create geometries table: " + e.getMessage());
-		}
+		
 		
 		List<String> tablesWithIRIs = new ArrayList<String>();
 		for(String tbl:extractPredicatesWithIRIObjects()) {
