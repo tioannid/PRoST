@@ -59,7 +59,7 @@ public class Main {
 		final Properties props = new Properties();
 		props.load(inStream);
 		PropertyConfigurator.configure(props);
-
+		long start=System.currentTimeMillis();
 		/*
 		 * Manage the CLI options
 		 */
@@ -307,6 +307,7 @@ public class Main {
 			executionTime = System.currentTimeMillis() - startTime;
 			logger.info("Time in ms to build the Vertical partitioning: " + String.valueOf(executionTime));
 		}
+		logger.info("Total time: "+(System.currentTimeMillis()-start));
 
 	}
 }

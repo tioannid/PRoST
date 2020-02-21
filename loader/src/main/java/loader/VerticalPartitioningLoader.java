@@ -15,6 +15,7 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.storage.StorageLevel;
 
 import com.esotericsoftware.minlog.Log;
 
@@ -75,11 +76,13 @@ public class VerticalPartitioningLoader extends Loader {
 					+ " (select * from triples where p='http://www.opengis.net/ont/geosparql#asWKT') w full outer join"
 					+ " (select * from triples where p='http://www.opengis.net/ont/geosparql#hasGeometry') g on "
 					+ " g.o=w.s");
+			geometries.persist(StorageLevel.MEMORY_AND_DISK());
 			geometries.write().saveAsTable("geometries");
 			//put as stats for geometries table the hasGeometry stats
 			long rows=geometries.count();
 			TableInfo tblInfo = new TableInfo(rows, rows, rows);
 			statistics.put("geometries", tblInfo);
+			geometries.unpersist();
 		} catch (Exception e) {
 			geometriesCreated=false;
 			logger.error("Could not create geometries table: " + e.getMessage());
@@ -127,11 +130,14 @@ public class VerticalPartitioningLoader extends Loader {
 					"SELECT %1$s, %2$s " + "FROM %3$s WHERE %4$s = '%5$s' ", column_name_subject, column_name_object, name_tripletable, column_name_predicate,
 					properties_names[i]);
 			
-
+			
 			// calculate stats
 			final Dataset<Row> table_VP = spark.sql(selectVPTable);
+			//final Dataset<Row> table_VP = spark.sql("select * from "+property);
+			//table_VP.persist(StorageLevel.MEMORY_AND_DISK());
+			
 			table_VP.write().saveAsTable(property);
-
+			spark.catalog().cacheTable(property);
 			if (computeStatistics) {
 				statistics.put(property, calculate_stats_table(table_VP, property));
 			}
@@ -139,6 +145,7 @@ public class VerticalPartitioningLoader extends Loader {
 			logger.info("Created VP table for the property: " + property);
 			final List<Row> sampledRowsList = table_VP.limit(3).collectAsList();
 			logger.info("First 3 rows sampled (or less if there are less): " + sampledRowsList);
+			//table_VP.unpersist();
 		}
 
 		

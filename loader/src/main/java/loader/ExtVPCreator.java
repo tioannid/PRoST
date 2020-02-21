@@ -10,6 +10,7 @@ import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.storage.StorageLevel;
 
 public class ExtVPCreator {
 
@@ -74,9 +75,10 @@ public class ExtVPCreator {
 				if (!(relType == "SS" && pred1 == pred2)) {
 					String sqlCommand = getExtVpSQLcommand(pred1, pred2, relType);
 					Dataset<Row> extVpTable = spark.sql(sqlCommand);
-					extVpTable.registerTempTable("extvp_table");
+					//extVpTable.registerTempTable("extvp_table");
 					// cache table to avoid recomputation of DF by storage to HDFS
-					//extVpTable.cache();
+					//extVpTable.persist(StorageLevel.MEMORY_AND_DISK());
+					extVpTable.cache();
 					// spark.catalog.cacheTable("extvp_table");
 					extVpTableSize = extVpTable.count();
 
@@ -91,7 +93,7 @@ public class ExtVPCreator {
 						unsavedTables++;
 					}
 
-					//extVpTable.unpersist();
+					extVpTable.unpersist();
 					// _spark.catalog.uncacheTable("extvp_table")
 
 				} else {
