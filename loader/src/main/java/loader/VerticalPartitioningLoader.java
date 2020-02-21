@@ -76,13 +76,16 @@ public class VerticalPartitioningLoader extends Loader {
 					+ " (select * from triples where p='http://www.opengis.net/ont/geosparql#asWKT') w full outer join"
 					+ " (select * from triples where p='http://www.opengis.net/ont/geosparql#hasGeometry') g on "
 					+ " g.o=w.s");
-			geometries.persist(StorageLevel.MEMORY_AND_DISK());
+			geometries.createOrReplaceTempView("geometries");
+			spark.catalog().cacheTable("geometries");
+			//geometries.persist(StorageLevel.MEMORY_AND_DISK());
 			geometries.write().saveAsTable("geometries");
 			//put as stats for geometries table the hasGeometry stats
 			long rows=geometries.count();
 			TableInfo tblInfo = new TableInfo(rows, rows, rows);
 			statistics.put("geometries", tblInfo);
-			geometries.unpersist();
+			//geometries.unpersist();
+			spark.catalog().uncacheTable("geometries");
 		} catch (Exception e) {
 			geometriesCreated=false;
 			logger.error("Could not create geometries table: " + e.getMessage());
@@ -133,11 +136,13 @@ public class VerticalPartitioningLoader extends Loader {
 			
 			// calculate stats
 			final Dataset<Row> table_VP = spark.sql(selectVPTable);
+			table_VP.createOrReplaceTempView(property);
+			spark.catalog().cacheTable(property);
 			//final Dataset<Row> table_VP = spark.sql("select * from "+property);
 			//table_VP.persist(StorageLevel.MEMORY_AND_DISK());
 			
 			table_VP.write().saveAsTable(property);
-			spark.catalog().cacheTable(property);
+			
 			if (computeStatistics) {
 				statistics.put(property, calculate_stats_table(table_VP, property));
 			}
@@ -180,6 +185,7 @@ public class VerticalPartitioningLoader extends Loader {
 		logger.info("Vertical Partitioning completed. Loaded " + String.valueOf(properties_names.length) + " tables.");
 
 		if (generateExtVP) {
+			spark.catalog().uncacheTable("triples");
 			ExtVPCreator extvp = new ExtVPCreator(predDictionary, spark, threshold, statistics, tablesWithIRIs);
 			logger.info("Creating SS ExtVP");
 			extvp.createExtVP("SS");
