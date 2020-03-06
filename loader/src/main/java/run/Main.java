@@ -4,7 +4,6 @@ import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
-import java.util.Set;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -20,8 +19,6 @@ import org.apache.spark.sql.SparkSession;
 
 import loader.TripleTableLoader;
 import loader.VerticalPartitioningLoader;
-import loader.WidePropertyTableLoader;
-import loader.WidePropertyTableLoader.PropertyTableType;
 
 /**
  * The Main class parses the CLI arguments and calls the executor.
@@ -43,13 +40,10 @@ public class Main {
 	private static boolean generateTT = true;
 	private static boolean generateWPT = false;
 	private static boolean generateVP = false;
-	private static boolean generateIWPT = false;
-	private static boolean generateJWPT = false;
 	private static boolean generateExtVP = false;
 	// options for physical partitioning
 	private static boolean ttPartitionedByPred = false;
 	private static boolean ttPartitionedBySub = false;
-	private static boolean wptPartitionedBySub = false;
 	private static String statFile;
 	private static String dictionaryFile;
 	private static double thresholdExtVP = 0.25;
@@ -169,15 +163,6 @@ public class Main {
 				generateTT = true;
 				logger.info("Logical strategy used: TT");
 			}
-			if (strategies.contains("WPT")) {
-				if (generateTT == false) {
-					generateTT = true;
-					logger.info(
-							"Logical strategy activated: TT (mandatory for WPT) with default physical partitioning");
-				}
-				generateWPT = true;
-				logger.info("Logical strategy used: WPT");
-			}
 			if (strategies.contains("VP")) {
 				if (generateTT == false) {
 					generateTT = true;
@@ -185,24 +170,6 @@ public class Main {
 				}
 				generateVP = true;
 				logger.info("Logical strategy used: VP");
-			}
-			if (strategies.contains("IWPT")) {
-				if (generateTT == false) {
-					generateTT = true;
-					logger.info(
-							"Logical strategy activated: TT (mandatory for IWPT) with default physical partitioning");
-				}
-				logger.info("Logical strategy used: IWPT");
-				generateIWPT = true;
-			}
-			if (strategies.contains("JWPT")) {
-				if (generateTT == false) {
-					generateTT = true;
-					logger.info(
-							"Logical strategy activated: TT (mandatory for JWPT) with default physical partitioning");
-				}
-				logger.info("Logical strategy used: JWPT");
-				generateJWPT = true;
 			}
 			if (strategies.contains("EXTVP")) {
 				if (generateTT == false) {
@@ -228,10 +195,7 @@ public class Main {
 			ttPartitionedBySub = true;
 			logger.info("Triple Table will be partitioned by subject.");
 		}
-		if (cmd.hasOption("wptPartitionedBySub")) {
-			wptPartitionedBySub = true;
-			logger.info("Wide Property Table will be partitioned by subject.");
-		}
+
 
 		// The defaulf value of dropDuplicates is true, so this needs to be
 		// changed just in case user sets it as false.
@@ -281,32 +245,9 @@ public class Main {
 			logger.info("Time in ms to build the Tripletable: " + String.valueOf(executionTime));
 		}
 
-		if (generateWPT) {
-			startTime = System.currentTimeMillis();
-			final WidePropertyTableLoader pt_loader =
-					new WidePropertyTableLoader(input_location, outputDB, spark, wptPartitionedBySub);
-			pt_loader.load();
-			executionTime = System.currentTimeMillis() - startTime;
-			logger.info("Time in ms to build the Property Table: " + String.valueOf(executionTime));
-		}
 
-		if (generateIWPT) {
-			startTime = System.currentTimeMillis();
-			final WidePropertyTableLoader ipt_loader = new WidePropertyTableLoader(input_location, outputDB, spark,
-					wptPartitionedBySub, PropertyTableType.IWPT);
-			ipt_loader.load();
-			executionTime = System.currentTimeMillis() - startTime;
-			logger.info("Time in ms to build the Inverse Property Table: " + String.valueOf(executionTime));
-		}
 
-		if (generateJWPT) {
-			startTime = System.currentTimeMillis();
-			final WidePropertyTableLoader joinedWpt_loader = new WidePropertyTableLoader(input_location, outputDB,
-					spark, wptPartitionedBySub, PropertyTableType.JWPT);
-			joinedWpt_loader.load();
-			executionTime = System.currentTimeMillis() - startTime;
-			logger.info("Time in ms to build the Joined Property Table: " + String.valueOf(executionTime));
-		}
+
 
 		if (generateVP) {
 			startTime = System.currentTimeMillis();

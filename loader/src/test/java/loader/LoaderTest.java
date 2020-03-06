@@ -42,20 +42,7 @@ class LoaderTest {
 		assert (numberPredicates > 0 && numberSubjects > 0);
 	}
 
-	@Test
-	void propertyTableTest() {
-		final WidePropertyTableLoader pt_loader = new WidePropertyTableLoader("", "testingDB", spark, false);
-		pt_loader.load();
-		final Dataset<Row> propertyTable = spark.sql("SELECT * FROM property_table");
 
-		// there should be a row for each distinct subject
-		final long ptNumberRows = propertyTable.count();
-		assert (ptNumberRows == numberSubjects);
-
-		// there should be a column for each distinct property (except the subject column)
-		final long ptNumberColumns = propertyTable.columns().length - 1;
-		assertEquals(numberPredicates, ptNumberColumns, "Number of columns must be " + numberPredicates);
-	}
 
 	@Test
 	void verticalPartitioningTest() {
