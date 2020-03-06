@@ -39,6 +39,7 @@ public class VerticalPartitioningLoader extends Loader {
 	private String metadata_file_name;
 	private boolean generateExtVP;
 	private double threshold;
+	private boolean dictEncoded;
 
 
 	public VerticalPartitioningLoader(final String hdfs_input_directory, final String database_name,
@@ -52,6 +53,7 @@ public class VerticalPartitioningLoader extends Loader {
 		this.metadata_file_name = statisticsfile;
 		this.generateExtVP = generateExtVP;
 		this.threshold = thresholdExtVP;		
+		this.dictEncoded = true;
 	}
 
 	@Override
@@ -66,15 +68,15 @@ public class VerticalPartitioningLoader extends Loader {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		
-		
+
+
 		boolean geometriesCreated=true;
 		// what happens if asWKT or hasGeometry does not exists?
 		try {
 			spark.sql("DROP TABLE IF EXISTS geometries");
 			Dataset<Row> geometries = spark.sql("Select g.s as entity, ifnull(w.s, g.o) as geom, w.o as wkt from "
-					+ " (select * from triples where p='http://www.opengis.net/ont/geosparql#asWKT') w full outer join"
-					+ " (select * from triples where p='http://www.opengis.net/ont/geosparql#hasGeometry') g on "
+					+ String.format(" (select * from 1%$s where p='http://www.opengis.net/ont/geosparql#asWKT') w full outer join", name_tripletable)
+					+ String.format(" (select * from 1%$s where p='http://www.opengis.net/ont/geosparql#hasGeometry') g on ", name_tripletable)
 					+ " g.o=w.s");
 			geometries.createOrReplaceTempView("geometries");
 			spark.catalog().cacheTable("geometries");
@@ -90,7 +92,11 @@ public class VerticalPartitioningLoader extends Loader {
 			geometriesCreated=false;
 			logger.error("Could not create geometries table: " + e.getMessage());
 		}
-		
+
+
+		if (this.dictEncoded)
+			this.name_tripletable = this.name_tripletable+"_zipped";
+
 
 		for (int i = 0; i < properties_names.length; i++) {
 			if(geometriesCreated && 
@@ -100,7 +106,13 @@ public class VerticalPartitioningLoader extends Loader {
 				predDictionary.remove(properties_names[i]);
 				continue;
 			}
-			final String property = this.predDictionary.get(properties_names[i]);
+			String property;
+			if (this.dictEncoded)
+				property  = this.predDictionary.get(properties_names[i])+"_zipped";
+			else
+				property  = this.predDictionary.get(properties_names[i]);
+
+
 			final String queryDropVPTableFixed = String.format("DROP TABLE IF EXISTS %s", property);
 			spark.sql(queryDropVPTableFixed);
 
@@ -134,7 +146,7 @@ public class VerticalPartitioningLoader extends Loader {
 					properties_names[i]);
 			
 			
-			// calculate stats
+			// calculate statspredDictionary
 			final Dataset<Row> table_VP = spark.sql(selectVPTable);
 			table_VP.createOrReplaceTempView(property);
 			spark.catalog().cacheTable(property);
@@ -155,7 +167,6 @@ public class VerticalPartitioningLoader extends Loader {
 
 		
 		
-		
 		List<String> tablesWithIRIs = new ArrayList<String>();
 		for(String tbl:extractPredicatesWithIRIObjects()) {
 			if(tbl.equals("http://www.opengis.net/ont/geosparql#hasGeometry") ||
@@ -174,18 +185,18 @@ public class VerticalPartitioningLoader extends Loader {
 		}
 		
 		// save the stats in a file with the same name as the output database
-				if (computeStatistics) {
-					try {
-						save_stats();
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
-				}
+		if (computeStatistics) {
+			try {
+				save_stats();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 
 		logger.info("Vertical Partitioning completed. Loaded " + String.valueOf(properties_names.length) + " tables.");
 
 		if (generateExtVP) {
-			spark.catalog().uncacheTable("triples");
+			spark.catalog().uncacheTable(name_tripletable);
 			ExtVPCreator extvp = new ExtVPCreator(predDictionary, spark, threshold, statistics, tablesWithIRIs);
 			logger.info("Creating SS ExtVP");
 			extvp.createExtVP("SS");
