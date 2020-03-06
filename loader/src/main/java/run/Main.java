@@ -53,6 +53,7 @@ public class Main {
 	private static String statFile;
 	private static String dictionaryFile;
 	private static double thresholdExtVP = 0.25;
+	private static String tripleTable = "triples";
 
 	public static void main(final String[] args) throws Exception {
 		final InputStream inStream = Main.class.getClassLoader().getResourceAsStream(loj4jFileName);
@@ -112,6 +113,11 @@ public class Main {
 		wptPartSubOpt.setRequired(false);
 		options.addOption(wptPartSubOpt);
 
+		final Option outputTripleTable = new Option("ott", "outTripleTable", true,
+				"name of triple table output (only for tripleTable)");
+		outputTripleTable.setRequired(false);
+		options.addOption(outputTripleTable);
+
 		final HelpFormatter formatter = new HelpFormatter();
 		CommandLine cmd = null;
 		try {
@@ -142,6 +148,10 @@ public class Main {
 		if (cmd.hasOption("dictionaryfile")) {
 			dictionaryFile= cmd.getOptionValue("dictionaryfile") ;
 			logger.info("Dictionary file: " + dictionaryFile);
+		}
+		//addition for DH
+		if (cmd.hasOption("outTripleTable")) {
+			tripleTable = cmd.getOptionValue("outTripleTable");
 		}
 
 		// default if a logical partition is not specified is: TT, WPT, and VP.
@@ -263,7 +273,7 @@ public class Main {
 
 		if (generateTT) {
 			startTime = System.currentTimeMillis();
-			final TripleTableLoader tt_loader = new TripleTableLoader(input_location, outputDB, spark,
+			final TripleTableLoader tt_loader = new TripleTableLoader(input_location, outputDB, tripleTable ,spark,
 					ttPartitionedBySub, ttPartitionedByPred, dropDuplicates);
 			tt_loader.load();
 			
