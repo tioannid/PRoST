@@ -1,24 +1,17 @@
 package run;
 
-import java.io.InputStream;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Properties;
-
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.MissingOptionException;
-import org.apache.commons.cli.Option;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.ParseException;
-import org.apache.commons.cli.PosixParser;
+import loader.DictionaryEncoder;
+import loader.TripleTableLoader;
+import loader.VerticalPartitioningLoader;
+import org.apache.commons.cli.*;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
 import org.apache.spark.sql.SparkSession;
 
-import loader.TripleTableLoader;
-import loader.VerticalPartitioningLoader;
+import java.io.InputStream;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Properties;
 
 /**
  * The Main class parses the CLI arguments and calls the executor.
@@ -41,6 +34,7 @@ public class Main {
 	private static boolean generateWPT = false;
 	private static boolean generateVP = false;
 	private static boolean generateExtVP = false;
+	private static boolean generateDEC = false;
 	// options for physical partitioning
 	private static boolean ttPartitionedByPred = false;
 	private static boolean ttPartitionedBySub = false;
@@ -153,6 +147,7 @@ public class Main {
 			generateTT = true;
 			generateWPT = true;
 			generateVP = true;
+			generateDEC = true;
 			logger.info("Logical strategy used: TT + WPT + VP");
 		} else {
 			lpStrategies = cmd.getOptionValue("logicalPartitionStrategies");
@@ -179,6 +174,9 @@ public class Main {
 				generateVP = true;
 				generateExtVP =  true;
 				logger.info("Logical strategy used: VP");
+			}
+			if (strategies.contains("DEC")) {
+				generateDEC = true;
 			}
 		}
 
@@ -245,6 +243,15 @@ public class Main {
 			logger.info("Time in ms to build the Tripletable: " + String.valueOf(executionTime));
 		}
 
+		if (generateDEC) {
+			startTime = System.currentTimeMillis();
+			final DictionaryEncoder de_loader = new DictionaryEncoder(input_location, outputDB, tripleTable ,spark,
+					null);
+			de_loader.load();
+
+			executionTime = System.currentTimeMillis() - startTime;
+			logger.info("Time in ms to build the Tripletable: " + String.valueOf(executionTime));
+		}
 
 
 

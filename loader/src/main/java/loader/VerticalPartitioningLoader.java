@@ -1,25 +1,16 @@
 package loader;
 
-import java.io.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 
-
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
+import java.io.IOException;
+import java.util.*;
 
 /**
  * Build the VP, i.e. a table for each predicate.
@@ -294,7 +285,7 @@ public class VerticalPartitioningLoader extends Loader {
 	
 	private List<String> extractPredicatesWithIRIObjects() {
 		if (this.dictEncoded)
-			return new List<String>();	//return an empty list as there are no items
+			return null;	//return an empty list as there are no items
 
 		String sql="select distinct " +column_name_predicate+" from "+
 				name_tripletable + " where " + column_name_object_type +" = 2 ";
