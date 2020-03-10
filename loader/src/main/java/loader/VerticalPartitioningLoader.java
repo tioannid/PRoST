@@ -9,15 +9,12 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.Vector;
 
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
-import org.apache.spark.storage.StorageLevel;
 
-import com.esotericsoftware.minlog.Log;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -55,24 +52,8 @@ public class VerticalPartitioningLoader extends Loader {
 		this.threshold = thresholdExtVP;		
 		this.dictEncoded = true;
 	}
-
-	@Override
-	public void load() {
-		logger.info("PHASE 3: creating the VP tables...");
-
-		if (properties_names == null) {
-			properties_names = extractProperties();
-		}
-		try {
-			generatePredicateDictionary();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-
-
-		boolean geometriesCreated=true;
-		// what happens if asWKT or hasGeometry does not exists?
-		try {
+	//
+	public void createGeometryTable() throws Exception{
 			spark.sql("DROP TABLE IF EXISTS geometries");
 			Dataset<Row> geometries = spark.sql("Select g.s as entity, ifnull(w.s, g.o) as geom, w.o as wkt from "
 					+ String.format(" (select * from 1%$s where p='http://www.opengis.net/ont/geosparql#asWKT') w full outer join", name_tripletable)
@@ -83,19 +64,42 @@ public class VerticalPartitioningLoader extends Loader {
 			//geometries.persist(StorageLevel.MEMORY_AND_DISK());
 			geometries.write().saveAsTable("geometries");
 			//put as stats for geometries table the hasGeometry stats
-			long rows=geometries.count();
+			long rows = geometries.count();
 			TableInfo tblInfo = new TableInfo(rows, rows, rows);
 			statistics.put("geometries", tblInfo);
 			//geometries.unpersist();
 			spark.catalog().uncacheTable("geometries");
+	}
+
+	@Override
+	public void load() {
+		logger.info("PHASE 3: creating the VP tables...");
+
+		//get properties name
+		if (properties_names == null) {
+			properties_names = extractProperties();
+		}
+
+		//generate predicate map, map long predicates into smaller names , pred1, pred2...
+
+		try {
+			generatePredicateDictionary();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+
+		boolean geometriesCreated=true;
+
+		try {
+			createGeometryTable();
 		} catch (Exception e) {
 			geometriesCreated=false;
 			logger.error("Could not create geometries table: " + e.getMessage());
 		}
 
 
-		if (this.dictEncoded)
-			this.name_tripletable = this.name_tripletable+"_zipped";
+
 
 
 		for (int i = 0; i < properties_names.length; i++) {
@@ -107,10 +111,7 @@ public class VerticalPartitioningLoader extends Loader {
 				continue;
 			}
 			String property;
-			if (this.dictEncoded)
-				property  = this.predDictionary.get(properties_names[i])+"_zipped";
-			else
-				property  = this.predDictionary.get(properties_names[i]);
+			property  = this.predDictionary.get(properties_names[i]);
 
 
 			final String queryDropVPTableFixed = String.format("DROP TABLE IF EXISTS %s", property);
