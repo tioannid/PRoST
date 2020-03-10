@@ -166,8 +166,10 @@ public class VerticalPartitioningLoader extends Loader {
 			//table_VP.unpersist();
 		}
 
+		// done with the vertical paritioning
+
 		
-		
+		// Extract IRIs
 		List<String> tablesWithIRIs = new ArrayList<String>();
 		for(String tbl:extractPredicatesWithIRIObjects()) {
 			if(tbl.equals("http://www.opengis.net/ont/geosparql#hasGeometry") ||
@@ -185,7 +187,7 @@ public class VerticalPartitioningLoader extends Loader {
 			logger.error("Could not save Information about tables with IRIs or Literals as objects: " + e.getMessage());
 		}
 		
-		// save the stats in a file with the same name as the output database
+		// Compute relevant statistics
 		if (computeStatistics) {
 			try {
 				save_stats();
@@ -218,7 +220,6 @@ public class VerticalPartitioningLoader extends Loader {
 		 */
 		
 		logger.info("properties with objects that are IRIs: "+tablesWithIRIs.toString());
-		//logger.info("properties with objects that are literals: "+tablesWithLiterals.toString());
 
 		/*Set<String> intersection = new HashSet<String>(tablesWithIRIs); // use the copy constructor
 		intersection.retainAll(tablesWithLiterals);
@@ -292,6 +293,9 @@ public class VerticalPartitioningLoader extends Loader {
 	}
 	
 	private List<String> extractPredicatesWithIRIObjects() {
+		if (this.dictEncoded)
+			return new List<String>();	//return an empty list as there are no items
+
 		String sql="select distinct " +column_name_predicate+" from "+
 				name_tripletable + " where " + column_name_object_type +" = 2 ";
 		return spark.sql(sql).as(Encoders.STRING()).collectAsList();
