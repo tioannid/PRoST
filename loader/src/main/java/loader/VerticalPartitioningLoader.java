@@ -31,6 +31,7 @@ public class VerticalPartitioningLoader extends Loader {
 
 
 	public VerticalPartitioningLoader(final String hdfs_input_directory, final String database_name,
+			final String input_table,
 			final SparkSession spark, final boolean computeStatistics, final String statisticsfile,
 			final String dictionaryfile, boolean generateExtVP, double thresholdExtVP) {
 		super(hdfs_input_directory, database_name, spark);
@@ -42,6 +43,7 @@ public class VerticalPartitioningLoader extends Loader {
 		this.generateExtVP = generateExtVP;
 		this.threshold = thresholdExtVP;		
 		this.dictEncoded = true;
+		this.name_tripletable = input_table;
 	}
 	//
 	public void createGeometryTable() throws Exception{
@@ -64,7 +66,7 @@ public class VerticalPartitioningLoader extends Loader {
 
 	@Override
 	public void load() {
-		logger.info("PHASE 3: creating the VP tables...");
+		logger.info("PHASE 3: creating the VP tables on "+ this.name_tripletable);
 
 		//get properties name
 		if (properties_names == null) {
@@ -284,8 +286,8 @@ public class VerticalPartitioningLoader extends Loader {
 	}
 	
 	private List<String> extractPredicatesWithIRIObjects() {
-		if (this.dictEncoded)
-			return null;	//return an empty list as there are no items
+//		if (this.dictEncoded)
+//			return new ArrayList<String>();	//return an empty list as there are no items
 
 		String sql="select distinct " +column_name_predicate+" from "+
 				name_tripletable + " where " + column_name_object_type +" = 2 ";

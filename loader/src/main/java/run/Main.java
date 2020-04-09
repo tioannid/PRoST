@@ -30,7 +30,7 @@ public class Main {
 	private static final Logger logger = Logger.getLogger("PRoST");
 	private static boolean useStatistics = false;
 	private static boolean dropDuplicates = true;
-	private static boolean generateTT = true;
+	private static boolean generateTT = false;
 	private static boolean generateWPT = false;
 	private static boolean generateVP = false;
 	private static boolean generateExtVP = false;
@@ -159,18 +159,10 @@ public class Main {
 				logger.info("Logical strategy used: TT");
 			}
 			if (strategies.contains("VP")) {
-				if (generateTT == false) {
-					generateTT = true;
-					logger.info("Logical strategy activated: TT (mandatory for VP) with default physical partitioning");
-				}
 				generateVP = true;
 				logger.info("Logical strategy used: VP");
 			}
 			if (strategies.contains("EXTVP")) {
-				if (generateTT == false) {
-					generateTT = true;
-					logger.info("Logical strategy activated: TT (mandatory for VP) with default physical partitioning");
-				}
 				generateVP = true;
 				generateExtVP =  true;
 				logger.info("Logical strategy used: VP");
@@ -212,10 +204,6 @@ public class Main {
 			if (!generateVP) {
 				logger.info("Logical strategy activated: VP. VP needed to generate statistics.");
 				generateVP = true;
-				if (generateTT == false) {
-					generateTT = true;
-					logger.info("Logical strategy activated: TT (mandatory for VP) with default physical partitioning");
-				}
 			}
 		}
 
@@ -259,7 +247,7 @@ public class Main {
 		if (generateVP) {
 			startTime = System.currentTimeMillis();
 			final VerticalPartitioningLoader vp_loader =
-					new VerticalPartitioningLoader(input_location, outputDB, spark, useStatistics, statFile,
+					new VerticalPartitioningLoader(input_location, outputDB, tripleTable, spark, useStatistics, statFile,
 							dictionaryFile, generateExtVP, thresholdExtVP);
 			vp_loader.load();
 			executionTime = System.currentTimeMillis() - startTime;
