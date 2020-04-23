@@ -24,7 +24,7 @@ public abstract class Loader {
 	protected SparkSession spark;
 	protected String database_name;
 	protected String hdfs_input_directory;
-	protected static final Logger logger = Logger.getLogger("PRoST");
+	protected static final Logger logger = Logger.getLogger(Loader.class.getSimpleName());
 	public boolean keep_temporary_tables = false;
 	public static final String table_format = "parquet";
 	public static final String max_length_col_name = "128";
@@ -41,17 +41,20 @@ public abstract class Loader {
 	public String stats_file_suffix = ".stats";
 
 	public Loader(final String hdfs_input_directory, final String database_name, final SparkSession spark) {
+                logger.info("Loader constructor() --->");
 		this.database_name =database_name ;
 		this.spark = spark;
 		this.hdfs_input_directory = hdfs_input_directory;
+                logger.info("---> Loader constructor() before setting Hive properties");
 		// Configurations (they should be working but they are not in Cloudera). Change hive-site.xml.
-		 spark.sql("SET hive.exec.dynamic.partition = true");
-		 spark.sql("SET hive.exec.dynamic.partition.mode = nonstrict");
-		 spark.sql("SET hive.exec.max.dynamic.partitions = 4000");
-		 spark.sql("SET hive.exec.max.dynamic.partitions.pernode = 2000");
-
+//		 spark.sql("SET hive.exec.dynamic.partition = true");
+//		 spark.sql("SET hive.exec.dynamic.partition.mode = nonstrict");
+//		 spark.sql("SET hive.exec.max.dynamic.partitions = 4000");
+//		 spark.sql("SET hive.exec.max.dynamic.partitions.pernode = 2000");
+//                 logger.info("<---Loader constructor() after setting Hive properties");
 		// from now on, set the right database
 		useOutputDatabase();
+                logger.info("<--- Loader constructor()");
 	}
 
 	public abstract void load() throws Exception;

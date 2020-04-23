@@ -47,6 +47,7 @@ public class Main {
 		final InputStream inStream = Main.class.getClassLoader().getResourceAsStream(loj4jFileName);
 		final Properties props = new Properties();
 		props.load(inStream);
+                logger.info(props.toString());
 		PropertyConfigurator.configure(props);
 		long start=System.currentTimeMillis();
 		/*

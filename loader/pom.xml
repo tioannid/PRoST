@@ -9,7 +9,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>PRoST</groupId>
 	<artifactId>PRoST-Loader</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>0.0.2-SNAPSHOT</version>
 	<packaging>jar</packaging>
 	<name>PRoST-executor</name>
 	<url>https://maven.apache.org</url>
@@ -17,6 +17,16 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven.compiler.source>1.8</maven.compiler.source>
 		<maven.compiler.target>1.8</maven.compiler.target>
+                 
+                <scala.version>2.12</scala.version>
+                <spark.version>2.4.4</spark.version>
+                <hadoop.version>2.10.0</hadoop.version>
+                
+                <!---
+                <scala.version>2.11</scala.version>
+                <spark.version>2.4.3</spark.version>
+                <hadoop.version>2.9.2</hadoop.version>
+                -->
 	</properties>
 	<dependencies>
 		<dependency>
@@ -38,21 +48,21 @@
 		</dependency>
 		<dependency>
 			<groupId>org.apache.spark</groupId>
-			<artifactId>spark-core_2.11</artifactId>
-			<version>2.1.0</version>
+			<artifactId>spark-core_${scala.version}</artifactId>
+			<version>${spark.version}</version>
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.spark</groupId>
-			<artifactId>spark-sql_2.11</artifactId>
-			<version>2.1.0</version>
+			<artifactId>spark-sql_${scala.version}</artifactId>
+			<version>${spark.version}</version>
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.spark</groupId>
-			<artifactId>spark-hive_2.11</artifactId>
-			<version>2.1.0</version>
-			<scope>provided</scope>
+			<artifactId>spark-hive_${scala.version}</artifactId>
+			<version>${spark.version}</version>
+		<!--	<scope>provided</scope> -->
 		</dependency>
 		
 		<dependency>
@@ -70,20 +80,20 @@
 		<dependency>
 			<groupId>org.apache.hadoop</groupId>
 			<artifactId>hadoop-common</artifactId>
-			<version>2.8.3</version>
+			<version>${hadoop.version}</version>
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.spark</groupId>
-			<artifactId>spark-catalyst_2.11</artifactId>
-			<version>2.1.0</version>
+			<artifactId>spark-catalyst_${scala.version}</artifactId>
+			<version>${spark.version}</version>
 			<scope>provided</scope>
 		</dependency>
 		<!-- https://mvnrepository.com/artifact/com.holdenkarau/spark-testing-base -->
 		<dependency>
 			<groupId>com.holdenkarau</groupId>
-			<artifactId>spark-testing-base_2.11</artifactId>
-			<version>2.2.0_0.10.0</version>
+			<artifactId>spark-testing-base_${scala.version}</artifactId>
+			<version>2.4.4_0.14.0</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
@@ -110,7 +120,7 @@
 				<configuration>
 					<archive>
 						<manifest>
-							<mainClass>loader.App</mainClass>
+							<mainClass>run.Main</mainClass>
 						</manifest>
 					</archive>
 					<descriptorRefs>

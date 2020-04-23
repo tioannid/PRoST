@@ -9,6 +9,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
+import org.apache.log4j.Logger;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.Dataset;
@@ -32,15 +33,18 @@ public class TripleTableLoader extends Loader {
 	protected boolean dropDuplicates = true;
 	protected boolean useRDFLoader = true;
 	protected boolean onlyGenerateMetadata = true;
+        protected final Logger logger = Logger.getLogger(TripleTableLoader.class.getSimpleName());
 	
 
 	public TripleTableLoader(final String hdfs_input_directory, final String database_name, final String output_table,final SparkSession spark,
 			final boolean ttPartitionedBySub, final boolean ttPartitionedByPred, final boolean dropDuplicates) {
 		super(hdfs_input_directory, database_name, spark);
+                logger.info("TripleTableLoader constructor() ---> (after super() constructor)");
 		this.name_tripletable = output_table;
 		this.ttPartitionedBySub = ttPartitionedBySub;
 		this.ttPartitionedByPred = ttPartitionedByPred;
 		this.dropDuplicates = dropDuplicates;
+                logger.info("<--- TripleTableLoader constructor()");
 		
 	}
 
