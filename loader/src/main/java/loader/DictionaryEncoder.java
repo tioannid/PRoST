@@ -62,9 +62,9 @@ public class DictionaryEncoder extends Loader {
                 dbName, distinctTable, mixedTable);
         String addRowNumber = String.format("CREATE TABLE %1$s.%2$s  AS (SELECT s as key, concat('%3$s', (row_number() over (order by s))) value FROM %1$s.%4$s)",
                 dbName, rowedTable, keyPrefix, distinctTable);
-        String createFinalPart1 = String.format("CREATE TABLE %1$s.%2$s as (SELECT * FROM %1$s.%3$s UNION select o, o FROM %1$s.%4$s WHERE OType=1",
-                dbName, final1, rowedTable, triples)
-        String createFinalPart1 = String.format("CREATE TABLE %1$s.%2$s as (SELECT t1.value as s,t.p,t2.value as o, t.OType FROM %1$s.%3$s t1, %1$s.%3$s t2, %1$s.%4$s t WHERE t1.key=t.s AND t2.key=t.o)"
+        String createFinalPart1 = String.format("CREATE TABLE %1$s.%2$s as (SELECT * FROM %1$s.%3$s UNION (select o, o FROM %1$s.%4$s WHERE OType=1))",
+                dbName, final1, rowedTable, tableName);
+        String createFinal = String.format("CREATE TABLE %1$s.%2$s as (SELECT t1.value as s,t.p,t2.value as o, t.OType FROM %1$s.%3$s t1, %1$s.%3$s t2, %1$s.%4$s t WHERE t1.key=t.s AND t2.key=t.o)"
                 ,dbName, finalTable, final1, tableName);
 
 
