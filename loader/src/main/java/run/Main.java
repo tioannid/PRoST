@@ -224,7 +224,7 @@ public class Main {
 		final SparkSession spark = SparkSession.builder().appName("PRoST-Loader")
 				//.master("local[*]")
 				.enableHiveSupport().getOrCreate();
-
+                
 		// Removing previous instances of the database in case a database with
 		// the same name already exists.
 		// In this case a new database with the same name will be created.

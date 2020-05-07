@@ -87,7 +87,7 @@ public abstract class Loader {
 	}
 
 	protected void useOutputDatabase() {
-		//spark.sql("CREATE DATABASE IF NOT EXISTS " + database_name);
+		spark.sql("CREATE DATABASE IF NOT EXISTS " + database_name);
 		spark.sql("USE " + database_name);
 		logger.info("Using the database: " + database_name);
 	}
