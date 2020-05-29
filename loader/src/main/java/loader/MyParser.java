@@ -93,7 +93,7 @@ public class MyParser extends NTriplesParser implements java.io.Serializable {
 							// trim spaces after URI and get the WKT value
 							wkt = wkt.substring(uriIndx + 1).trim();
 						}
-						rdf = new RDFStatement(subj.toString(), pred.toString(), l.getLabel(), objectType);
+						rdf = new RDFStatement(subj.toString(), pred.toString(), wkt, objectType);
 					} else {
 						// keep the whole literal including datatype
 
