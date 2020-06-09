@@ -1,5 +1,6 @@
 package run;
 
+import loader.PrefixEncoder;
 import loader.DictionaryEncoder;
 import loader.TripleTableLoader;
 import loader.VerticalPartitioningLoader;
@@ -35,6 +36,9 @@ public class Main {
 	private static boolean generateVP = false;
 	private static boolean generateExtVP = false;
 	private static boolean generateDEC = false;
+	private static boolean generatePEC = false;
+
+
 	// options for physical partitioning
 	private static boolean ttPartitionedByPred = false;
 	private static boolean ttPartitionedBySub = false;
@@ -62,11 +66,11 @@ public class Main {
 		final Option outputOpt = new Option("o", "output", true, "Output database name.");
 		outputOpt.setRequired(true);
 		options.addOption(outputOpt);
-		
+
 		final Option statFileOpt = new Option("sf", "statisticsfile", true, "Statistics Filename.");
 		statFileOpt.setRequired(true);
 		options.addOption(statFileOpt);
-		
+
 		final Option dictFileOpt = new Option("df", "dictionaryfile", true, "Dictionary Filename.");
 		dictFileOpt.setRequired(true);
 		options.addOption(dictFileOpt);
@@ -169,6 +173,12 @@ public class Main {
 			}
 			if (strategies.contains("DEC")) {
 				generateDEC = true;
+				logger.info("Logical strategy used: DEC");
+
+			}
+			if (strategies.contains("PEC")) {
+				generatePEC = true;
+				logger.info("Logical strategy used: PEC");
 			}
 		}
 
@@ -219,14 +229,14 @@ public class Main {
 
 		long startTime;
 		long executionTime;
-		
+
 
 		if (generateTT) {
 			startTime = System.currentTimeMillis();
 			final TripleTableLoader tt_loader = new TripleTableLoader(input_location, outputDB, tripleTable ,spark,
 					ttPartitionedBySub, ttPartitionedByPred, dropDuplicates);
 			tt_loader.load();
-			
+
 			executionTime = System.currentTimeMillis() - startTime;
 			logger.info("Time in ms to build the Tripletable: " + String.valueOf(executionTime));
 		}
@@ -236,6 +246,16 @@ public class Main {
 			final DictionaryEncoder de_loader = new DictionaryEncoder(input_location, outputDB, tripleTable ,spark,
 					null);
 			de_loader.load();
+
+			executionTime = System.currentTimeMillis() - startTime;
+			logger.info("Time in ms to build the Tripletable: " + String.valueOf(executionTime));
+		}
+
+		if (generatePEC) {
+			startTime = System.currentTimeMillis();
+			final PrefixEncoder pe_loader = new PrefixEncoder(input_location, outputDB, tripleTable ,spark,
+					null);
+			pe_loader.load();
 
 			executionTime = System.currentTimeMillis() - startTime;
 			logger.info("Time in ms to build the Tripletable: " + String.valueOf(executionTime));
