@@ -56,6 +56,7 @@ public abstract class Loader {
 
 	public abstract void load() throws Exception;
 
+
 	/**
 	 * Replace all not allowed characters of a DB column name by an underscore("_") and return a valid DB column name.
 	 * The datastore accepts only characters in the range [a-zA-Z0-9_]

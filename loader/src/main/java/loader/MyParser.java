@@ -1,10 +1,17 @@
 package loader;
 
-import org.eclipse.rdf4j.model.IRI;
+import org.apache.log4j.Logger;
+import org.eclipse.rdf4j.model.*;
 import org.eclipse.rdf4j.model.impl.NumericLiteral;
 import org.eclipse.rdf4j.model.impl.SimpleStatement;
 import org.eclipse.rdf4j.rio.RDFParseException;
 import org.eclipse.rdf4j.rio.ntriples.NTriplesParser;
+
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+
 import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
 
 import org.eclipse.rdf4j.model.Literal;
@@ -14,15 +21,15 @@ import org.eclipse.rdf4j.model.Value;
 
 import java.io.*;
 import java.net.URI;
+
 import java.nio.charset.Charset;
-import java.util.Set;
-import org.apache.log4j.Logger;
 
 public class MyParser extends NTriplesParser implements java.io.Serializable {
 
 	private SimpleStatement st;
 	private RDFStatement rdf;
 	protected static final Logger logger = Logger.getLogger("PRoST");
+
 
 	public SimpleStatement getStatement() {
 		return this.st;
@@ -31,6 +38,7 @@ public class MyParser extends NTriplesParser implements java.io.Serializable {
 	public RDFStatement getRdf() {
 		return rdf;
 	}
+
 
 	RDFStatement parseLine(String line) throws IOException {
 		//try {

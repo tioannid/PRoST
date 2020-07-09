@@ -1,28 +1,16 @@
 package loader;
 
-import java.io.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.Vector;
-
-import org.apache.spark.sql.Dataset;
-import org.apache.spark.sql.Encoders;
-import org.apache.spark.sql.Row;
-import org.apache.spark.sql.SparkSession;
-import org.apache.spark.storage.StorageLevel;
-
-import com.esotericsoftware.minlog.Log;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Encoders;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SparkSession;
+
+import java.io.IOException;
+import java.util.*;
 
 /**
  * Build the VP, i.e. a table for each predicate.
@@ -39,9 +27,11 @@ public class VerticalPartitioningLoader extends Loader {
 	private String metadata_file_name;
 	private boolean generateExtVP;
 	private double threshold;
+	private boolean dictEncoded;
 
 
 	public VerticalPartitioningLoader(final String hdfs_input_directory, final String database_name,
+			final String input_table,
 			final SparkSession spark, final boolean computeStatistics, final String statisticsfile,
 			final String dictionaryfile, boolean generateExtVP, double thresholdExtVP) {
 		super(hdfs_input_directory, database_name, spark);
@@ -52,45 +42,58 @@ public class VerticalPartitioningLoader extends Loader {
 		this.metadata_file_name = statisticsfile;
 		this.generateExtVP = generateExtVP;
 		this.threshold = thresholdExtVP;		
+		this.dictEncoded = true;
+		this.name_tripletable = input_table;
 	}
-
-	@Override
-	public void load() {
-		logger.info("PHASE 3: creating the VP tables...");
-
-		if (properties_names == null) {
-			properties_names = extractProperties();
-		}
-		try {
-			generatePredicateDictionary();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-		
-		
-		boolean geometriesCreated=true;
-		// what happens if asWKT or hasGeometry does not exists?
-		try {
+	//
+	public void createGeometryTable() throws Exception{
 			spark.sql("DROP TABLE IF EXISTS geometries");
 			Dataset<Row> geometries = spark.sql("Select g.s as entity, ifnull(w.s, g.o) as geom, w.o as wkt from "
-					+ " (select * from triples where p='http://www.opengis.net/ont/geosparql#asWKT') w full outer join"
-					+ " (select * from triples where p='http://www.opengis.net/ont/geosparql#hasGeometry') g on "
+					+ String.format(" (select * from 1%$s where p='http://www.opengis.net/ont/geosparql#asWKT') w full outer join", name_tripletable)
+					+ String.format(" (select * from 1%$s where p='http://www.opengis.net/ont/geosparql#hasGeometry') g on ", name_tripletable)
 					+ " g.o=w.s");
 			geometries.createOrReplaceTempView("geometries");
 			spark.catalog().cacheTable("geometries");
 			//geometries.persist(StorageLevel.MEMORY_AND_DISK());
 			geometries.write().saveAsTable("geometries");
 			//put as stats for geometries table the hasGeometry stats
-			long rows=geometries.count();
+			long rows = geometries.count();
 			TableInfo tblInfo = new TableInfo(rows, rows, rows);
 			statistics.put("geometries", tblInfo);
 			//geometries.unpersist();
 			spark.catalog().uncacheTable("geometries");
+	}
+
+	@Override
+	public void load() {
+		logger.info("PHASE 3: creating the VP tables on "+ this.name_tripletable);
+
+		//get properties name
+		if (properties_names == null) {
+			properties_names = extractProperties();
+		}
+
+		//generate predicate map, map long predicates into smaller names , pred1, pred2...
+
+		try {
+			generatePredicateDictionary();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+
+		boolean geometriesCreated=true;
+
+		try {
+			createGeometryTable();
 		} catch (Exception e) {
 			geometriesCreated=false;
 			logger.error("Could not create geometries table: " + e.getMessage());
 		}
-		
+
+
+
+
 
 		for (int i = 0; i < properties_names.length; i++) {
 			if(geometriesCreated && 
@@ -100,7 +103,10 @@ public class VerticalPartitioningLoader extends Loader {
 				predDictionary.remove(properties_names[i]);
 				continue;
 			}
-			final String property = this.predDictionary.get(properties_names[i]);
+			String property;
+			property  = this.predDictionary.get(properties_names[i]);
+
+
 			final String queryDropVPTableFixed = String.format("DROP TABLE IF EXISTS %s", property);
 			spark.sql(queryDropVPTableFixed);
 
@@ -134,7 +140,7 @@ public class VerticalPartitioningLoader extends Loader {
 					properties_names[i]);
 			
 			
-			// calculate stats
+			// calculate statspredDictionary
 			final Dataset<Row> table_VP = spark.sql(selectVPTable);
 			table_VP.createOrReplaceTempView(property);
 			spark.catalog().cacheTable(property);
@@ -153,9 +159,10 @@ public class VerticalPartitioningLoader extends Loader {
 			//table_VP.unpersist();
 		}
 
+		// done with the vertical paritioning
+
 		
-		
-		
+		// Extract IRIs
 		List<String> tablesWithIRIs = new ArrayList<String>();
 		for(String tbl:extractPredicatesWithIRIObjects()) {
 			if(tbl.equals("http://www.opengis.net/ont/geosparql#hasGeometry") ||
@@ -173,19 +180,19 @@ public class VerticalPartitioningLoader extends Loader {
 			logger.error("Could not save Information about tables with IRIs or Literals as objects: " + e.getMessage());
 		}
 		
-		// save the stats in a file with the same name as the output database
-				if (computeStatistics) {
-					try {
-						save_stats();
-					} catch (IOException e) {
-						e.printStackTrace();
-					}
-				}
+		// Compute relevant statistics
+		if (computeStatistics) {
+			try {
+				save_stats();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 
 		logger.info("Vertical Partitioning completed. Loaded " + String.valueOf(properties_names.length) + " tables.");
 
 		if (generateExtVP) {
-			spark.catalog().uncacheTable("triples");
+			spark.catalog().uncacheTable(name_tripletable);
 			ExtVPCreator extvp = new ExtVPCreator(predDictionary, spark, threshold, statistics, tablesWithIRIs);
 			logger.info("Creating SS ExtVP");
 			extvp.createExtVP("SS");
@@ -206,7 +213,6 @@ public class VerticalPartitioningLoader extends Loader {
 		 */
 		
 		logger.info("properties with objects that are IRIs: "+tablesWithIRIs.toString());
-		//logger.info("properties with objects that are literals: "+tablesWithLiterals.toString());
 
 		/*Set<String> intersection = new HashSet<String>(tablesWithIRIs); // use the copy constructor
 		intersection.retainAll(tablesWithLiterals);
@@ -280,6 +286,9 @@ public class VerticalPartitioningLoader extends Loader {
 	}
 	
 	private List<String> extractPredicatesWithIRIObjects() {
+//		if (this.dictEncoded)
+//			return new ArrayList<String>();	//return an empty list as there are no items
+
 		String sql="select distinct " +column_name_predicate+" from "+
 				name_tripletable + " where " + column_name_object_type +" = 2 ";
 		return spark.sql(sql).as(Encoders.STRING()).collectAsList();

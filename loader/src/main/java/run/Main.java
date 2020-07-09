@@ -1,27 +1,18 @@
 package run;
 
-import java.io.InputStream;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Properties;
-import java.util.Set;
-
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.MissingOptionException;
-import org.apache.commons.cli.Option;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.ParseException;
-import org.apache.commons.cli.PosixParser;
+import loader.PrefixEncoder;
+import loader.DictionaryEncoder;
+import loader.TripleTableLoader;
+import loader.VerticalPartitioningLoader;
+import org.apache.commons.cli.*;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
 import org.apache.spark.sql.SparkSession;
 
-import loader.TripleTableLoader;
-import loader.VerticalPartitioningLoader;
-import loader.WidePropertyTableLoader;
-import loader.WidePropertyTableLoader.PropertyTableType;
+import java.io.InputStream;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Properties;
 
 /**
  * The Main class parses the CLI arguments and calls the executor.
@@ -40,19 +31,21 @@ public class Main {
 	private static final Logger logger = Logger.getLogger("PRoST");
 	private static boolean useStatistics = false;
 	private static boolean dropDuplicates = true;
-	private static boolean generateTT = true;
+	private static boolean generateTT = false;
 	private static boolean generateWPT = false;
 	private static boolean generateVP = false;
-	private static boolean generateIWPT = false;
-	private static boolean generateJWPT = false;
 	private static boolean generateExtVP = false;
+	private static boolean generateDEC = false;
+	private static boolean generatePEC = false;
+
+
 	// options for physical partitioning
 	private static boolean ttPartitionedByPred = false;
 	private static boolean ttPartitionedBySub = false;
-	private static boolean wptPartitionedBySub = false;
 	private static String statFile;
 	private static String dictionaryFile;
 	private static double thresholdExtVP = 0.25;
+	private static String tripleTable = "triples";
 
 	public static void main(final String[] args) throws Exception {
 		final InputStream inStream = Main.class.getClassLoader().getResourceAsStream(loj4jFileName);
@@ -73,11 +66,11 @@ public class Main {
 		final Option outputOpt = new Option("o", "output", true, "Output database name.");
 		outputOpt.setRequired(true);
 		options.addOption(outputOpt);
-		
+
 		final Option statFileOpt = new Option("sf", "statisticsfile", true, "Statistics Filename.");
 		statFileOpt.setRequired(true);
 		options.addOption(statFileOpt);
-		
+
 		final Option dictFileOpt = new Option("df", "dictionaryfile", true, "Dictionary Filename.");
 		dictFileOpt.setRequired(true);
 		options.addOption(dictFileOpt);
@@ -112,6 +105,11 @@ public class Main {
 		wptPartSubOpt.setRequired(false);
 		options.addOption(wptPartSubOpt);
 
+		final Option outputTripleTable = new Option("ott", "outTripleTable", true,
+				"name of triple table output (only for tripleTable)");
+		outputTripleTable.setRequired(false);
+		options.addOption(outputTripleTable);
+
 		final HelpFormatter formatter = new HelpFormatter();
 		CommandLine cmd = null;
 		try {
@@ -143,12 +141,17 @@ public class Main {
 			dictionaryFile= cmd.getOptionValue("dictionaryfile") ;
 			logger.info("Dictionary file: " + dictionaryFile);
 		}
+		//addition for DH
+		if (cmd.hasOption("outTripleTable")) {
+			tripleTable = cmd.getOptionValue("outTripleTable");
+		}
 
 		// default if a logical partition is not specified is: TT, WPT, and VP.
 		if (!cmd.hasOption("logicalPartitionStrategies")) {
 			generateTT = true;
 			generateWPT = true;
 			generateVP = true;
+			generateDEC = true;
 			logger.info("Logical strategy used: TT + WPT + VP");
 		} else {
 			lpStrategies = cmd.getOptionValue("logicalPartitionStrategies");
@@ -159,49 +162,23 @@ public class Main {
 				generateTT = true;
 				logger.info("Logical strategy used: TT");
 			}
-			if (strategies.contains("WPT")) {
-				if (generateTT == false) {
-					generateTT = true;
-					logger.info(
-							"Logical strategy activated: TT (mandatory for WPT) with default physical partitioning");
-				}
-				generateWPT = true;
-				logger.info("Logical strategy used: WPT");
-			}
 			if (strategies.contains("VP")) {
-				if (generateTT == false) {
-					generateTT = true;
-					logger.info("Logical strategy activated: TT (mandatory for VP) with default physical partitioning");
-				}
 				generateVP = true;
 				logger.info("Logical strategy used: VP");
 			}
-			if (strategies.contains("IWPT")) {
-				if (generateTT == false) {
-					generateTT = true;
-					logger.info(
-							"Logical strategy activated: TT (mandatory for IWPT) with default physical partitioning");
-				}
-				logger.info("Logical strategy used: IWPT");
-				generateIWPT = true;
-			}
-			if (strategies.contains("JWPT")) {
-				if (generateTT == false) {
-					generateTT = true;
-					logger.info(
-							"Logical strategy activated: TT (mandatory for JWPT) with default physical partitioning");
-				}
-				logger.info("Logical strategy used: JWPT");
-				generateJWPT = true;
-			}
 			if (strategies.contains("EXTVP")) {
-				if (generateTT == false) {
-					generateTT = true;
-					logger.info("Logical strategy activated: TT (mandatory for VP) with default physical partitioning");
-				}
 				generateVP = true;
 				generateExtVP =  true;
 				logger.info("Logical strategy used: VP");
+			}
+			if (strategies.contains("DEC")) {
+				generateDEC = true;
+				logger.info("Logical strategy used: DEC");
+
+			}
+			if (strategies.contains("PEC")) {
+				generatePEC = true;
+				logger.info("Logical strategy used: PEC");
 			}
 		}
 
@@ -218,10 +195,7 @@ public class Main {
 			ttPartitionedBySub = true;
 			logger.info("Triple Table will be partitioned by subject.");
 		}
-		if (cmd.hasOption("wptPartitionedBySub")) {
-			wptPartitionedBySub = true;
-			logger.info("Wide Property Table will be partitioned by subject.");
-		}
+
 
 		// The defaulf value of dropDuplicates is true, so this needs to be
 		// changed just in case user sets it as false.
@@ -240,10 +214,6 @@ public class Main {
 			if (!generateVP) {
 				logger.info("Logical strategy activated: VP. VP needed to generate statistics.");
 				generateVP = true;
-				if (generateTT == false) {
-					generateTT = true;
-					logger.info("Logical strategy activated: TT (mandatory for VP) with default physical partitioning");
-				}
 			}
 		}
 
@@ -259,49 +229,45 @@ public class Main {
 
 		long startTime;
 		long executionTime;
-		
+
 
 		if (generateTT) {
 			startTime = System.currentTimeMillis();
-			final TripleTableLoader tt_loader = new TripleTableLoader(input_location, outputDB, spark,
+			final TripleTableLoader tt_loader = new TripleTableLoader(input_location, outputDB, tripleTable ,spark,
 					ttPartitionedBySub, ttPartitionedByPred, dropDuplicates);
 			tt_loader.load();
-			
+
 			executionTime = System.currentTimeMillis() - startTime;
 			logger.info("Time in ms to build the Tripletable: " + String.valueOf(executionTime));
 		}
 
-		if (generateWPT) {
+		if (generateDEC) {
 			startTime = System.currentTimeMillis();
-			final WidePropertyTableLoader pt_loader =
-					new WidePropertyTableLoader(input_location, outputDB, spark, wptPartitionedBySub);
-			pt_loader.load();
+			final DictionaryEncoder de_loader = new DictionaryEncoder(input_location, outputDB, tripleTable ,spark,
+					null);
+			de_loader.load();
+
 			executionTime = System.currentTimeMillis() - startTime;
-			logger.info("Time in ms to build the Property Table: " + String.valueOf(executionTime));
+			logger.info("Time in ms to build the Tripletable: " + String.valueOf(executionTime));
 		}
 
-		if (generateIWPT) {
+		if (generatePEC) {
 			startTime = System.currentTimeMillis();
-			final WidePropertyTableLoader ipt_loader = new WidePropertyTableLoader(input_location, outputDB, spark,
-					wptPartitionedBySub, PropertyTableType.IWPT);
-			ipt_loader.load();
+			final PrefixEncoder pe_loader = new PrefixEncoder(input_location, outputDB, tripleTable ,spark,
+					null);
+			pe_loader.load();
+
 			executionTime = System.currentTimeMillis() - startTime;
-			logger.info("Time in ms to build the Inverse Property Table: " + String.valueOf(executionTime));
+			logger.info("Time in ms to build the Tripletable: " + String.valueOf(executionTime));
 		}
 
-		if (generateJWPT) {
-			startTime = System.currentTimeMillis();
-			final WidePropertyTableLoader joinedWpt_loader = new WidePropertyTableLoader(input_location, outputDB,
-					spark, wptPartitionedBySub, PropertyTableType.JWPT);
-			joinedWpt_loader.load();
-			executionTime = System.currentTimeMillis() - startTime;
-			logger.info("Time in ms to build the Joined Property Table: " + String.valueOf(executionTime));
-		}
+
+
 
 		if (generateVP) {
 			startTime = System.currentTimeMillis();
 			final VerticalPartitioningLoader vp_loader =
-					new VerticalPartitioningLoader(input_location, outputDB, spark, useStatistics, statFile,
+					new VerticalPartitioningLoader(input_location, outputDB, tripleTable, spark, useStatistics, statFile,
 							dictionaryFile, generateExtVP, thresholdExtVP);
 			vp_loader.load();
 			executionTime = System.currentTimeMillis() - startTime;
