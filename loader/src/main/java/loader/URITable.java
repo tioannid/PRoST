@@ -27,7 +27,7 @@ public class URITable {
         full = item.getString(0);
         List<String> l = PrefixEncoder.splitURI(item);
         left = PrefixEncoder.reconURI(l, 1, 4 , "http:/");
-        right = PrefixEncoder.reconURI(l, 5, -1, "");
+        right = PrefixEncoder.reconURI(l, 4, -1, "");
 
 
 
