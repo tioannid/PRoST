@@ -56,7 +56,10 @@ public class PrefixEncoder extends Loader {
 
     public static String reconURI(List<String> ls, int start, int end, String prefix) {
         int i;
-        for (i = start; i < end && i < ls.size() - 1 && end > 0; i++) {
+        if (end < 0) {
+            end = 0xffffff;
+        }
+        for (i = start; i < end && i < ls.size() - 1 ; i++) {
             prefix = prefix + ls.get(i) + "/";
         }
         if (i < ls.size())
