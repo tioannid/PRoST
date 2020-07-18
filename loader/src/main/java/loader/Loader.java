@@ -45,10 +45,10 @@ public abstract class Loader {
 		this.spark = spark;
 		this.hdfs_input_directory = hdfs_input_directory;
 		// Configurations (they should be working but they are not in Cloudera). Change hive-site.xml.
-		 spark.sql("SET hive.exec.dynamic.partition = true");
-		 spark.sql("SET hive.exec.dynamic.partition.mode = nonstrict");
-		 spark.sql("SET hive.exec.max.dynamic.partitions = 4000");
-		 spark.sql("SET hive.exec.max.dynamic.partitions.pernode = 2000");
+//		 spark.sql("SET hive.exec.dynamic.partition = true");
+//		 spark.sql("SET hive.exec.dynamic.partition.mode = nonstrict");
+//		 spark.sql("SET hive.exec.max.dynamic.partitions = 4000");
+//		 spark.sql("SET hive.exec.max.dynamic.partitions.pernode = 2000");
 
 		// from now on, set the right database
 		useOutputDatabase();
@@ -84,7 +84,7 @@ public abstract class Loader {
 	}
 
 	protected void useOutputDatabase() {
-		//spark.sql("CREATE DATABASE IF NOT EXISTS " + database_name);
+		spark.sql("CREATE DATABASE IF NOT EXISTS " + database_name);
 		spark.sql("USE " + database_name);
 		logger.info("Using the database: " + database_name);
 	}
