@@ -49,8 +49,8 @@ public class VerticalPartitioningLoader extends Loader {
 	public void createGeometryTable() throws Exception{
 			spark.sql("DROP TABLE IF EXISTS geometries");
 			Dataset<Row> geometries = spark.sql("Select g.s as entity, ifnull(w.s, g.o) as geom, w.o as wkt from "
-					+ String.format(" (select * from 1%$s where p='http://www.opengis.net/ont/geosparql#asWKT') w full outer join", name_tripletable)
-					+ String.format(" (select * from 1%$s where p='http://www.opengis.net/ont/geosparql#hasGeometry') g on ", name_tripletable)
+					+ String.format(" (select * from %s where p='http://www.opengis.net/ont/geosparql#asWKT') w full outer join", name_tripletable)
+					+ String.format(" (select * from %s where p='http://www.opengis.net/ont/geosparql#hasGeometry') g on ", name_tripletable)
 					+ " g.o=w.s");
 			geometries.createOrReplaceTempView("geometries");
 			spark.catalog().cacheTable("geometries");
