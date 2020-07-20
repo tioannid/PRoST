@@ -278,6 +278,7 @@ public class VerticalPartitioningLoader extends Loader {
 
 		final List<String> propertiesList = Arrays.asList(properties);
 		logger.info("Number of distinct predicates found: " + propertiesList.size());
+		logger.info("Predicates: " + propertiesList.toString());
 		final String[] cleanedProperties = handleCaseInsPred(properties);
 		final List<String> cleanedPropertiesList = Arrays.asList(cleanedProperties);
 		logger.info("Final list of predicates: " + cleanedPropertiesList);
@@ -304,6 +305,11 @@ public class VerticalPartitioningLoader extends Loader {
 		final Iterator<String> it = propertiesSet.iterator();
 		while (it.hasNext()) {
 			final String predicate = it.next();
+			logger.info("Next Predicate: " + predicate);
+			if(predicate == null) {
+				logger.error("null predicate encountered");
+				continue;
+			}
 			if (seenPredicates.contains(predicate.toLowerCase())) {
 				originalRemovedPredicates.add(predicate);
 			} else {
