@@ -96,6 +96,7 @@ public class VerticalPartitioningLoader extends Loader {
 
 
 		for (int i = 0; i < properties_names.length; i++) {
+			if(properties_names[i] == null) continue;
 			if(geometriesCreated && 
 					(properties_names[i].equals("http://www.opengis.net/ont/geosparql#asWKT") || 
 							properties_names[i].equals("http://www.opengis.net/ont/geosparql#hasGeometry")	)) {

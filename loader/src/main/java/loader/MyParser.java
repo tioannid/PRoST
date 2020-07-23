@@ -103,9 +103,9 @@ public class MyParser extends NTriplesParser implements java.io.Serializable {
 						}
 						rdf = new RDFStatement(subj.toString(), pred.toString(), wkt, objectType);
 					} else {
-						// keep the whole literal including datatype
-
-						rdf = new RDFStatement(subj.toString(), pred.toString(), obj.toString(), objectType);
+						// No! Do not keep the whole literal including datatype
+						rdf = new RDFStatement(subj.toString(), pred.toString(), l.getLabel(), objectType);
+						//rdf = new RDFStatement(subj.toString(), pred.toString(), obj.toString(), objectType);
 					}
 				}
 
