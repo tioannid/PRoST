@@ -1,4 +1,4 @@
-package loader;
+package loader2;
 
 import org.apache.log4j.Logger;
 import org.eclipse.rdf4j.model.*;
@@ -10,16 +10,10 @@ import org.eclipse.rdf4j.rio.ntriples.NTriplesParser;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-
-import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
-
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
-
-import java.io.*;
-import java.net.URI;
 
 import java.nio.charset.Charset;
 

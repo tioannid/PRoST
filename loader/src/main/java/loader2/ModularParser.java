@@ -1,49 +1,60 @@
-package loader;
-
-import org.apache.log4j.Logger;
-import org.eclipse.rdf4j.model.*;
-import org.eclipse.rdf4j.model.impl.NumericLiteral;
-import org.eclipse.rdf4j.model.impl.SimpleStatement;
-import org.eclipse.rdf4j.rio.RDFParseException;
-import org.eclipse.rdf4j.rio.ntriples.NTriplesParser;
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+package loader2;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-
-import org.eclipse.rdf4j.rio.ntriples.NTriplesUtil;
-
+import java.nio.charset.Charset;
+import java.util.logging.Level;
+import org.apache.log4j.Logger;
+import org.eclipse.rdf4j.model.IRI;
 import org.eclipse.rdf4j.model.Literal;
 import org.eclipse.rdf4j.model.Resource;
 import org.eclipse.rdf4j.model.Statement;
 import org.eclipse.rdf4j.model.Value;
+import org.eclipse.rdf4j.model.impl.NumericLiteral;
+import org.eclipse.rdf4j.model.impl.SimpleStatement;
+import org.eclipse.rdf4j.model.vocabulary.GEO;
+import org.eclipse.rdf4j.model.vocabulary.RDF;
+import org.eclipse.rdf4j.model.vocabulary.RDFS;
+import org.eclipse.rdf4j.model.vocabulary.XSD;
+import org.eclipse.rdf4j.rio.RDFHandlerException;
+import org.eclipse.rdf4j.rio.RDFParseException;
+import org.eclipse.rdf4j.rio.ntriples.NTriplesParser;
+import run2.Main;
 
-import java.io.*;
-import java.net.URI;
+/**
+ *
+ * @author tioannid
+ */
+public class ModularParser extends NTriplesParser implements java.io.Serializable {
 
-import java.nio.charset.Charset;
+    // ----- STATIC MEMBERS -----
+    protected static final Logger logger = Logger.getLogger(Main.appName);
 
-public class MyParser extends NTriplesParser implements java.io.Serializable {
-
+    // ----- DATA MEMEBERS -----
     private SimpleStatement st;
     private RDFStatement rdf;
-    protected static final Logger logger = Logger.getLogger("PRoST");
 
-    public SimpleStatement getStatement() {
-        return this.st;
+    // ----- CONSTRUCTORS -----
+    // ----- DATA ACCESSORS -----
+    public SimpleStatement getSt() {
+        return st;
     }
 
     public RDFStatement getRdf() {
         return rdf;
     }
 
-    RDFStatement parseLine(String line) throws IOException {
-        //try {
+    // ----- METHODS -----
+    RDFStatement parseLine(String line) throws RDFParseException, RDFHandlerException, IOException {
+
         this.parse((InputStream) (new ByteArrayInputStream(line.getBytes(Charset.forName("UTF-8")))), "HELLO");
 
-        //} catch (IOException e) {
-        //	;
-        //}
         return this.rdf;
     }
 
@@ -54,22 +65,26 @@ public class MyParser extends NTriplesParser implements java.io.Serializable {
          */
         try {
             this.st = (SimpleStatement) super.createStatement(subj, pred, obj);
+
+            // Calculate Object type and Object string
             int objectType = 0;
             // if it is numeric, string or wkt keep only the value, else keep the whole
             // string
+            String objString = obj.toString();
+
             if (obj instanceof Literal) {
                 objectType = 1;
                 if (obj instanceof NumericLiteral) {
                     NumericLiteral l = (NumericLiteral) obj;
-                    rdf = new RDFStatement(subj.toString(), pred.toString(), l.getLabel(), objectType);
+                    objString = l.getLabel();
                 } else {
                     Literal l = (Literal) obj;
-                    if (l.getDatatype().stringValue().equals("http://www.w3.org/1999/02/22-rdf-syntax-ns#langString")
-                            || l.getDatatype().stringValue().equals("http://www.w3.org/2001/XMLSchema#string")) {
-                        rdf = new RDFStatement(subj.toString(), pred.toString(), l.getLabel(), objectType);
+                    IRI liri = l.getDatatype();
+                    String lirival = liri.stringValue();
+                    if (lirival.equals(RDF.LANGSTRING) || lirival.equals(XSD.STRING)) {
+                        objString = l.getLabel();
                         // we should also keep the language!
-                    } else if (l.getDatatype().stringValue()
-                            .equals("http://www.opengis.net/ont/geosparql#wktLiteral")) {
+                    } else if (lirival.equals(GEO.WKT_LITERAL)) {
                         // wkt
                         String wkt = l.getLabel().trim();
                         //srid = GeoConstants.default_GeoSPARQL_SRID;
@@ -95,18 +110,17 @@ public class MyParser extends NTriplesParser implements java.io.Serializable {
                             // trim spaces after URI and get the WKT value
                             wkt = wkt.substring(uriIndx + 1).trim();
                         }
-                        rdf = new RDFStatement(subj.toString(), pred.toString(), wkt, objectType);
+                        objString = wkt;
                     } else {
                         // No! Do not keep the whole literal including datatype
-                        rdf = new RDFStatement(subj.toString(), pred.toString(), l.getLabel(), objectType);
-                        //rdf = new RDFStatement(subj.toString(), pred.toString(), obj.toString(), objectType);
+                        objString = l.getLabel();
                     }
                 }
-
             } else {
                 objectType = 2;
-                rdf = new RDFStatement(subj.toString(), pred.toString(), obj.toString(), objectType);
             }
+
+            rdf = new RDFStatement(subj.toString(), pred.toString(), objString, objectType);
 
             return null;
         } catch (Exception e) {

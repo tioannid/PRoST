@@ -1,9 +1,6 @@
-package run;
+package run2;
 
-import loader.PrefixEncoder;
-import loader.DictionaryEncoder;
-import loader.TripleTableLoader;
-import loader.VerticalPartitioningLoader;
+import loader2.*;
 import org.apache.commons.cli.*;
 import org.apache.log4j.Logger;
 import org.apache.log4j.PropertyConfigurator;
@@ -13,6 +10,7 @@ import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
+import loader2.configuration.TripleTableSchema;
 
 /**
  * The Main class parses the CLI arguments and calls the executor.
@@ -26,11 +24,13 @@ import java.util.Properties;
  */
 public class Main {
 
+    public static String appName = "PRoST Loader-2";
     private static String input_location;
     private static String outputDB;
+    private static boolean dropDB;
     private static String lpStrategies;
     private static String loj4jFileName = "log4j.properties";
-    private static final Logger logger = Logger.getLogger("PRoST");
+    private static final Logger logger = Logger.getLogger(appName);
     private static boolean useStatistics = false;
     private static boolean dropDuplicates = true;
     private static boolean generateTT = false;
@@ -45,8 +45,17 @@ public class Main {
     private static boolean ttPartitionedBySub = false;
     private static String statFile;
     private static String dictionaryFile;
+    private static String namespacePrefixFile = "";
+    private static boolean nsPrefixDictEncode = false; // do not encode with Namespace Prefix dictionary
     private static double thresholdExtVP = 0.25;
     private static String tripleTable = "triples";
+
+    private static boolean flagDBExists = false; // DB exists? Assume not!
+    private static boolean flagCreateDB = !flagDBExists;  // Create DB!
+    private static TripleTableSchema tttschema = new TripleTableSchema();
+    private static TripleTableSchema gttschema = new TripleTableSchema();
+    private static boolean useHiveQL_TableCreation = false; // use Spark SQL
+    private static String hiveTableFormat = "TextFile";   //  TextFile, SequenceFile, RCfile, ORC, and Parquet
 
     public static void main(final String[] args) throws Exception {
         final InputStream inStream = Main.class.getClassLoader().getResourceAsStream(loj4jFileName);
@@ -68,6 +77,11 @@ public class Main {
         outputOpt.setRequired(true);
         options.addOption(outputOpt);
 
+        // tioa
+        final Option dropDbOpt = new Option("drdb", "dropdb", true, "Drop database.");
+        dropDbOpt.setRequired(false);
+        options.addOption(dropDbOpt);
+
         final Option statFileOpt = new Option("sf", "statisticsfile", true, "Statistics Filename.");
         statFileOpt.setRequired(true);
         options.addOption(statFileOpt);
@@ -75,6 +89,19 @@ public class Main {
         final Option dictFileOpt = new Option("df", "dictionaryfile", true, "Dictionary Filename.");
         dictFileOpt.setRequired(true);
         options.addOption(dictFileOpt);
+
+        // tioa
+        // Namespace Prefix file in JSON format
+        final Option namespacePrefixFileOpt = new Option("nsprf", "namespaceprefixfile", true, "Namespace Prefix Filename.");
+        namespacePrefixFileOpt.setRequired(false);
+        options.addOption(namespacePrefixFileOpt);
+
+        // tioa
+        // Controls whether tables are written with Sparql Sql or HiveQL
+        final Option HiveQLOpt = new Option("hiveql", "HiveQL", false,
+                "Option for using HiveQL instead of Spark SQL for storing tables.");
+        HiveQLOpt.setRequired(false);
+        options.addOption(HiveQLOpt);
 
         final Option lpOpt = new Option("lp", "logicalPartitionStrategies", true, "Logical Partition Strategy.");
         lpOpt.setRequired(false);
@@ -110,6 +137,13 @@ public class Main {
                 "name of triple table output (only for tripleTable)");
         outputTripleTable.setRequired(false);
         options.addOption(outputTripleTable);
+        
+        // tioa
+        final Option hiveTableFormatOpt = new Option("tblfrm", "hiveTableFormat", true,
+                "Hive default table format.");
+        hiveTableFormatOpt.setRequired(false);
+        options.addOption(hiveTableFormatOpt);
+        
 
         final HelpFormatter formatter = new HelpFormatter();
         CommandLine cmd = null;
@@ -134,6 +168,24 @@ public class Main {
             outputDB = cmd.getOptionValue("output");
             logger.info("Output database set to: " + outputDB);
         }
+
+        // tioa
+        // if "dropdb" is missing then the default behaviour is:
+        // DB does not exist, therefore create it!
+        if (cmd.hasOption("dropdb")) {
+            dropDB = Boolean.getBoolean(cmd.getOptionValue("dropdb"));
+            if (dropDB) { // DB exists, but I want to re-create it!
+                flagDBExists = true;
+                flagCreateDB = true;
+                logger.info("Drop database " + outputDB);
+            } else {    // DB exists, but I want to use it,
+                // probably produce extra information based on existing
+                // tables!
+                flagDBExists = true;
+                flagCreateDB = false;
+                logger.info("Use existing database " + outputDB);
+            }
+        }
         if (cmd.hasOption("statisticsfile")) {
             statFile = cmd.getOptionValue("statisticsfile");
             logger.info("Statistics file: " + statFile);
@@ -142,18 +194,39 @@ public class Main {
             dictionaryFile = cmd.getOptionValue("dictionaryfile");
             logger.info("Dictionary file: " + dictionaryFile);
         }
+
+        // tioa
+        if (cmd.hasOption("namespaceprefixfile")) {
+            namespacePrefixFile = cmd.getOptionValue("namespaceprefixfile");
+            nsPrefixDictEncode = true;
+            logger.info("Namespace Prefix Filename: " + namespacePrefixFile);
+        }
+
+        // tioa
+        if (cmd.hasOption("HiveQL")) {
+            useHiveQL_TableCreation = true; // use HiveQL for table creation
+            logger.info("Using HiveQL instead of Spark SQL for storing tables");
+        }
+
+        // tioa
+        if (cmd.hasOption("hiveTableFormat")) {
+            hiveTableFormat = cmd.getOptionValue("hiveTableFormat");
+            logger.info("Hive default table format: " + hiveTableFormat);
+        }
+
         //addition for DH
         if (cmd.hasOption("outTripleTable")) {
-            tripleTable = cmd.getOptionValue("outTripleTable");
+            tttschema.setTblname(cmd.getOptionValue("outTripleTable"));
         }
+        gttschema.setTblname("g_".concat(tttschema.getTblname()));
 
         // default if a logical partition is not specified is: TT, WPT, and VP.
         if (!cmd.hasOption("logicalPartitionStrategies")) {
-            generateTT = true;
-            generateWPT = true;
-            generateVP = true;
-            generateDEC = true;
-            logger.info("Logical strategy used: TT + WPT + VP");
+//            generateTT = true;
+//            generateWPT = true;
+//            generateVP = true;
+//            generateDEC = true;
+//            logger.info("Logical strategy used: TT + WPT + VP");
         } else {
             lpStrategies = cmd.getOptionValue("logicalPartitionStrategies");
 
@@ -217,58 +290,60 @@ public class Main {
             }
         }
 
-        // Set the loader from the inputFile to the outputDB
-        final SparkSession spark = SparkSession.builder().appName("PRoST-Loader")
-                //.master("local[*]")
+        final SparkSession spark = SparkSession.builder().appName(appName)
                 .enableHiveSupport().getOrCreate();
-
-        // Removing previous instances of the database in case a database with
-        // the same name already exists.
-        // In this case a new database with the same name will be created.
-        //spark.sql("DROP DATABASE IF EXISTS " + outputDB + " CASCADE");
+        spark.sql("SET hive.default.fileformat=" + hiveTableFormat);
+        
         long startTime;
         long executionTime;
 
         if (generateTT) {
             startTime = System.currentTimeMillis();
-            final TripleTableLoader tt_loader = new TripleTableLoader(input_location, outputDB, tripleTable, spark,
-                    ttPartitionedBySub, ttPartitionedByPred, dropDuplicates);
+            final TripleTableLoader tt_loader
+                    = new TripleTableLoader(spark, outputDB,
+                            flagDBExists, flagCreateDB,
+                            input_location, false,
+                            ttPartitionedBySub, ttPartitionedByPred,
+                            dropDuplicates, tttschema, gttschema,
+                            namespacePrefixFile, nsPrefixDictEncode,
+                            useHiveQL_TableCreation);
             tt_loader.load();
-
+            flagDBExists = tt_loader.isFlagDBExists();
+            flagCreateDB = tt_loader.isFlagCreateDB();
             executionTime = System.currentTimeMillis() - startTime;
             logger.info("Time in ms to build the Tripletable: " + String.valueOf(executionTime));
         }
 
-        if (generateDEC) {
-            startTime = System.currentTimeMillis();
-            final DictionaryEncoder de_loader = new DictionaryEncoder(input_location, outputDB, tripleTable, spark,
-                    null);
-            de_loader.load();
-
-            executionTime = System.currentTimeMillis() - startTime;
-            logger.info("Time in ms to build the Tripletable: " + String.valueOf(executionTime));
-        }
-
-        if (generatePEC) {
-            startTime = System.currentTimeMillis();
-            final PrefixEncoder pe_loader = new PrefixEncoder(input_location, outputDB, tripleTable, spark,
-                    null);
-            pe_loader.load();
-
-            executionTime = System.currentTimeMillis() - startTime;
-            logger.info("Time in ms to build the Tripletable: " + String.valueOf(executionTime));
-        }
-
-        if (generateVP) {
-            startTime = System.currentTimeMillis();
-            final VerticalPartitioningLoader vp_loader
-                    = new VerticalPartitioningLoader(input_location, outputDB, tripleTable, spark, useStatistics, statFile,
-                            dictionaryFile, generateExtVP, thresholdExtVP);
-            vp_loader.load();
-            executionTime = System.currentTimeMillis() - startTime;
-            logger.info("Time in ms to build the Vertical partitioning: " + String.valueOf(executionTime));
-        }
+//        if (generateDEC) {
+//            startTime = System.currentTimeMillis();
+//            final DictionaryEncoder de_loader
+//                    = new DictionaryEncoder(input_location, outputDB, spark, flagDBExists, flagCreateDB,
+//                            tripleTable);
+//            de_loader.load();
+//            
+//            executionTime = System.currentTimeMillis() - startTime;
+//            logger.info("Time in ms to build the Tripletable: " + String.valueOf(executionTime));
+//        }
+//        
+//        if (generatePEC) {
+//            startTime = System.currentTimeMillis();
+//            final PrefixEncoder pe_loader
+//                    = new PrefixEncoder(input_location, outputDB, spark, flagDBExists, flagCreateDB,
+//                            tripleTable);
+//            pe_loader.load();
+//            
+//            executionTime = System.currentTimeMillis() - startTime;
+//            logger.info("Time in ms to build the Tripletable: " + String.valueOf(executionTime));
+//        }
+//        if (generateVP) {
+//            startTime = System.currentTimeMillis();
+//            final VerticalPartitioningLoader vp_loader
+//                    = new VerticalPartitioningLoader(input_location, outputDB, spark, flagDBExists, flagCreateDB,
+//                            tripleTable, useStatistics, statFile, dictionaryFile, generateExtVP, thresholdExtVP);
+//            vp_loader.load();
+//            executionTime = System.currentTimeMillis() - startTime;
+//            logger.info("Time in ms to build the Vertical partitioning: " + String.valueOf(executionTime));
+//        }
         logger.info("Total time: " + (System.currentTimeMillis() - start));
-
     }
 }
