@@ -46,6 +46,7 @@ public class Main {
     private static String statFile;
     private static String dictionaryFile;
     private static String namespacePrefixFile = "";
+    private static String asWKTFile = "";
     private static boolean nsPrefixDictEncode = false; // do not encode with Namespace Prefix dictionary
     private static double thresholdExtVP = 0.25;
     private static String tripleTable = "triples";
@@ -95,6 +96,12 @@ public class Main {
         final Option namespacePrefixFileOpt = new Option("nsprf", "namespaceprefixfile", true, "Namespace Prefix Filename.");
         namespacePrefixFileOpt.setRequired(false);
         options.addOption(namespacePrefixFileOpt);
+
+        // tioa
+        // Namespace Prefix file in JSON format
+        final Option asWKTFileOpt = new Option("aswkt", "propAsWKT", true, "#asWKT properties file.");
+        asWKTFileOpt.setRequired(false);
+        options.addOption(asWKTFileOpt);
 
         // tioa
         // Controls whether tables are written with Sparql Sql or HiveQL
@@ -203,6 +210,12 @@ public class Main {
         }
 
         // tioa
+        if (cmd.hasOption("propAsWKT")) {
+            asWKTFile = cmd.getOptionValue("propAsWKT");
+            logger.info("#asWKT properties file: " + asWKTFile);
+        }
+
+        // tioa
         if (cmd.hasOption("HiveQL")) {
             useHiveQL_TableCreation = true; // use HiveQL for table creation
             logger.info("Using HiveQL instead of Spark SQL for storing tables");
@@ -306,7 +319,8 @@ public class Main {
                             ttPartitionedBySub, ttPartitionedByPred,
                             dropDuplicates, tttschema, gttschema,
                             namespacePrefixFile, nsPrefixDictEncode,
-                            useHiveQL_TableCreation);
+                            useHiveQL_TableCreation,
+                            asWKTFile);
             tt_loader.load();
             flagDBExists = tt_loader.isFlagDBExists();
             flagCreateDB = tt_loader.isFlagCreateDB();
