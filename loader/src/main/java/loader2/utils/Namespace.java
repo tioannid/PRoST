@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package loader2.utils;
 
 import java.io.Serializable;
@@ -22,9 +17,12 @@ public class Namespace implements Serializable {
 
     // ----- DATA MEMEBERS -----
     private String namespace;
-    private String uri;
+    private String uri; // URI without < >
 
     // ----- CONSTRUCTORS -----
+    public Namespace() {    
+    }
+
     // ----- DATA ACCESSORS -----
     public String getNamespace() {
         return namespace;

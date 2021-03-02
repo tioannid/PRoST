@@ -1,16 +1,9 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package loader2.utils;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import org.apache.log4j.Logger;
-import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.SparkSession;
@@ -35,6 +28,18 @@ public class AsWKTDictionary implements Serializable {
 
     // ----- CONSTRUCTORS -----
     // 1. Detailed/Base Constructor
+    /**
+     * Read from the HDFS {@link asWKTFile} the asWKT properties and load
+     * them to a list, while registering the name of the table where the
+     * list of asWKT properties will be persisted and whether HiveQL should
+     * be used for the creation.
+     * 
+     * @param spark
+     * @param asWKTFile HDFS file with the asWKT properties to use for indexing
+     * @param asWKTTableName the table where the asWKT properties will be stored
+     * @param useHiveQL_TableCreation <tt>true</tt> if the should be created
+     *              with HiveQL, otherwise create it with Spark SQL
+     */
     public AsWKTDictionary(SparkSession spark, String asWKTFile,
             String asWKTTableName, boolean useHiveQL_TableCreation) {
         this.spark = spark;
@@ -43,6 +48,7 @@ public class AsWKTDictionary implements Serializable {
         if (!asWKTFile.isEmpty()) {
             asWKTList = spark.read().textFile(asWKTFile).collectAsList();
         }
+        // TODO: Check if GEO.AS_WKT exists before inserting it again!
         // add the GeoSPARQL standard asWKT property
         asWKTList.add(GEO.AS_WKT.stringValue());
         // update properties for future Hive table creation
@@ -70,7 +76,7 @@ public class AsWKTDictionary implements Serializable {
         // update list
         this.asWKTList.addAll(inferredAsWKTList);
         // persist extra asWKT properties to Hive table
-        Dataset<String> asWKTDS = spark.createDataset(asWKTList, Encoders.STRING());
+        Dataset<String> asWKTDS = spark.createDataset(asWKTList, Encoders.STRING()).distinct();
         if (useHiveQL_TableCreation) { // use HiveQL
             asWKTDS.createOrReplaceTempView("tmp_asWKT");
             spark.sql(String.format(
