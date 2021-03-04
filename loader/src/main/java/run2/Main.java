@@ -46,6 +46,7 @@ public class Main {
     private static String statFile;
     private static String dictionaryFile;
     private static String namespacePrefixFile = "";
+    private static String asWKTFile = "";
     private static boolean nsPrefixDictEncode = false; // do not encode with Namespace Prefix dictionary
     private static double thresholdExtVP = 0.25;
     private static String tripleTable = "triples";
@@ -83,11 +84,11 @@ public class Main {
         options.addOption(dropDbOpt);
 
         final Option statFileOpt = new Option("sf", "statisticsfile", true, "Statistics Filename.");
-        statFileOpt.setRequired(true);
+        statFileOpt.setRequired(false);
         options.addOption(statFileOpt);
 
         final Option dictFileOpt = new Option("df", "dictionaryfile", true, "Dictionary Filename.");
-        dictFileOpt.setRequired(true);
+        dictFileOpt.setRequired(false); // required for VP but not for TT
         options.addOption(dictFileOpt);
 
         // tioa
@@ -95,6 +96,12 @@ public class Main {
         final Option namespacePrefixFileOpt = new Option("nsprf", "namespaceprefixfile", true, "Namespace Prefix Filename.");
         namespacePrefixFileOpt.setRequired(false);
         options.addOption(namespacePrefixFileOpt);
+
+        // tioa
+        // Namespace Prefix file in JSON format
+        final Option asWKTFileOpt = new Option("aswkt", "propAsWKT", true, "#asWKT properties file.");
+        asWKTFileOpt.setRequired(false);
+        options.addOption(asWKTFileOpt);
 
         // tioa
         // Controls whether tables are written with Sparql Sql or HiveQL
@@ -173,7 +180,7 @@ public class Main {
         // if "dropdb" is missing then the default behaviour is:
         // DB does not exist, therefore create it!
         if (cmd.hasOption("dropdb")) {
-            dropDB = Boolean.getBoolean(cmd.getOptionValue("dropdb"));
+            dropDB = Boolean.parseBoolean(cmd.getOptionValue("dropdb"));
             if (dropDB) { // DB exists, but I want to re-create it!
                 flagDBExists = true;
                 flagCreateDB = true;
@@ -200,6 +207,12 @@ public class Main {
             namespacePrefixFile = cmd.getOptionValue("namespaceprefixfile");
             nsPrefixDictEncode = true;
             logger.info("Namespace Prefix Filename: " + namespacePrefixFile);
+        }
+
+        // tioa
+        if (cmd.hasOption("propAsWKT")) {
+            asWKTFile = cmd.getOptionValue("propAsWKT");
+            logger.info("#asWKT properties file: " + asWKTFile);
         }
 
         // tioa
@@ -306,7 +319,8 @@ public class Main {
                             ttPartitionedBySub, ttPartitionedByPred,
                             dropDuplicates, tttschema, gttschema,
                             namespacePrefixFile, nsPrefixDictEncode,
-                            useHiveQL_TableCreation);
+                            useHiveQL_TableCreation,
+                            asWKTFile);
             tt_loader.load();
             flagDBExists = tt_loader.isFlagDBExists();
             flagCreateDB = tt_loader.isFlagCreateDB();
@@ -335,15 +349,22 @@ public class Main {
 //            executionTime = System.currentTimeMillis() - startTime;
 //            logger.info("Time in ms to build the Tripletable: " + String.valueOf(executionTime));
 //        }
-//        if (generateVP) {
-//            startTime = System.currentTimeMillis();
-//            final VerticalPartitioningLoader vp_loader
-//                    = new VerticalPartitioningLoader(input_location, outputDB, spark, flagDBExists, flagCreateDB,
-//                            tripleTable, useStatistics, statFile, dictionaryFile, generateExtVP, thresholdExtVP);
-//            vp_loader.load();
-//            executionTime = System.currentTimeMillis() - startTime;
-//            logger.info("Time in ms to build the Vertical partitioning: " + String.valueOf(executionTime));
-//        }
+        if (generateVP) {
+            startTime = System.currentTimeMillis();
+            final VerticalPartitioningLoader vp_loader
+                    = new VerticalPartitioningLoader(spark, outputDB,
+                            flagDBExists, flagCreateDB,
+                            input_location, false,
+                            ttPartitionedBySub, ttPartitionedByPred,
+                            dropDuplicates, tttschema, gttschema,
+                            namespacePrefixFile, nsPrefixDictEncode,
+                            useHiveQL_TableCreation,
+                            asWKTFile,
+                            dictionaryFile, generateExtVP, thresholdExtVP);
+            vp_loader.load();
+            executionTime = System.currentTimeMillis() - startTime;
+            logger.info("Time in ms to build the Vertical partitioning: " + String.valueOf(executionTime));
+        }
         logger.info("Total time: " + (System.currentTimeMillis() - start));
     }
 }

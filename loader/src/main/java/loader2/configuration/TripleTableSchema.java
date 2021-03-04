@@ -80,5 +80,4 @@ public class TripleTableSchema implements java.io.Serializable {
     public void setTblformat(String tblformat) {
         this.tblFormat = tblformat;
     }
-
 }
