@@ -168,7 +168,7 @@
                     </finalName>
                     <archive>
                         <manifest>
-                            <mainClass>loader.App</mainClass>
+                            <mainClass>run2.Main</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>
