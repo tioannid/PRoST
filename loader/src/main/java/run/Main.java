@@ -1,6 +1,7 @@
 package run;
 
 import loader.PrefixEncoder;
+import loader.DE9IMGeometriesRelationsLoader;
 import loader.DictionaryEncoder;
 import loader.TripleTableLoader;
 import loader.VerticalPartitioningLoader;
@@ -27,6 +28,7 @@ import java.util.Properties;
 public class Main {
 
     private static String input_location;
+    private static String relations_location;
     private static String outputDB;
     private static String lpStrategies;
     private static String loj4jFileName = "log4j.properties";
@@ -39,7 +41,8 @@ public class Main {
     private static boolean generateExtVP = false;
     private static boolean generateDEC = false;
     private static boolean generatePEC = false;
-
+    private static boolean cacherelations = false;
+    
     // options for physical partitioning
     private static boolean ttPartitionedByPred = false;
     private static boolean ttPartitionedBySub = false;
@@ -64,6 +67,10 @@ public class Main {
         inputOpt.setRequired(true);
         options.addOption(inputOpt);
 
+        final Option geometriesDE9IM = new Option("de9im", "DE9IM", true, "HDFS path of the geometries DE9IM relations file.");
+        geometriesDE9IM.setRequired(false);
+        options.addOption(geometriesDE9IM);        
+        
         final Option outputOpt = new Option("o", "output", true, "Output database name.");
         outputOpt.setRequired(true);
         options.addOption(outputOpt);
@@ -129,6 +136,11 @@ public class Main {
         if (cmd.hasOption("input")) {
             input_location = cmd.getOptionValue("input");
             logger.info("Input path set to: " + input_location);
+        }
+        if (cmd.hasOption("DE9IM")) {
+        	relations_location = cmd.getOptionValue("DE9IM");
+            logger.info("Relations path set to: " + relations_location);
+            cacherelations = true;
         }
         if (cmd.hasOption("output")) {
             outputDB = cmd.getOptionValue("output");
@@ -259,6 +271,16 @@ public class Main {
             logger.info("Time in ms to build the Tripletable: " + String.valueOf(executionTime));
         }
 
+        if (cacherelations) {
+            startTime = System.currentTimeMillis();
+            logger.info(relations_location);
+            final DE9IMGeometriesRelationsLoader DE9IM_loader
+                    = new DE9IMGeometriesRelationsLoader(input_location, outputDB, spark,relations_location);
+            DE9IM_loader.load();
+            executionTime = System.currentTimeMillis() - startTime;
+            logger.info("Time in ms to create geometries relations tables: " + String.valueOf(executionTime));        	
+        }        
+        
         if (generateVP) {
             startTime = System.currentTimeMillis();
             final VerticalPartitioningLoader vp_loader
@@ -268,6 +290,7 @@ public class Main {
             executionTime = System.currentTimeMillis() - startTime;
             logger.info("Time in ms to build the Vertical partitioning: " + String.valueOf(executionTime));
         }
+        
         logger.info("Total time: " + (System.currentTimeMillis() - start));
 
     }
