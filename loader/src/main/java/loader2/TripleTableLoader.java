@@ -23,9 +23,11 @@ import loader2.utils.NamespaceDictionary;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.Function;
+import org.apache.spark.api.java.function.MapFunction;
 import org.apache.spark.api.java.function.PairFunction;
 
 import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.Row;
 import static org.apache.spark.sql.functions.col;
 import org.eclipse.rdf4j.model.vocabulary.GEO;
@@ -95,7 +97,8 @@ public class TripleTableLoader extends Loader implements Serializable {
         this.createUseNsDict = createUseNsDict;
         this.namespacePrefixJSONFile = namespacePrefixJSONFile;
         if (createUseNsDict) {
-            nsDict = new NamespaceDictionary(spark, namespacePrefixJSONFile, nsPrefTableName);
+            nsDict = new NamespaceDictionary(spark, namespacePrefixJSONFile,
+                    nsPrefTableName, useHiveQL_TableCreation);
         } else {
             nsDict = null;
         }
@@ -202,7 +205,7 @@ public class TripleTableLoader extends Loader implements Serializable {
         private static final String SUBPROPERTYOF = RDFS.SUBPROPERTYOF.stringValue();
 
         @Override
-        public Iterator<String> call(RDFStatement rdf) throws Exception {
+        public Iterator<String> call(RDFStatement rdf) {
             Set<String> s = new HashSet();
             String p = rdf.getP(), o = rdf.getO();
             if (p.equalsIgnoreCase(AS_WKT)) { // default GEO.AS_WKT is present
@@ -257,14 +260,17 @@ public class TripleTableLoader extends Loader implements Serializable {
         JavaRDD<String> inputFile, spatialPropsRDD;
         JavaRDD<RDFStatement> rdfRDD = null,
                 spatialRDD = null, thematicRDD = null;
-        //MyParser par = new MyParser();
-        // create RDD from all the parsed n-triple files
+        // create an RDD of RDFStatement from all the parsed n-triple files
         ModularParser par = new ModularParser();
+        Dataset<Row> triplesDF = null;
         try {
-            RemoteIterator<LocatedFileStatus> i = FileSystem.get(sparkContext.hadoopConfiguration()).listFiles(new Path(directory), false);
+            RemoteIterator<LocatedFileStatus> i = FileSystem.get(sparkContext.hadoopConfiguration()).listLocatedStatus(new Path(directory));
             while (i.hasNext()) {
                 Path path = i.next().getPath();
-                inputFile = sparkContext.textFile(path.toString());
+                triplesDF = spark.read().load(path.toString());
+                inputFile = triplesDF.map(
+                        (MapFunction<Row, String>) row -> row.getString(0),
+                        Encoders.STRING()).javaRDD();
                 if (rdfRDD != null) {
                     rdfRDD = rdfRDD.union(inputFile.map(line -> par.parseLine(line)));
                 } else {
@@ -304,7 +310,7 @@ public class TripleTableLoader extends Loader implements Serializable {
                     tttschema.getTblname()));
             dictEncodedSpatialRdfDS.createOrReplaceTempView("tmp_dictencodedaswkt");
             spark.sql(String.format(
-                    "CREATE TABLE %1$s AS SELECT s,p,o FROM tmp_dictencodedaswkt",
+                    "CREATE TABLE %1$s AS SELECT s,p,o, ST_GeomFromWKT(o) AS bwkt FROM tmp_dictencodedaswkt",
                     gttschema.getTblname()));
         } else {    // use Spark SQL
             dictEncodedRdfDS.write().saveAsTable(tttschema.getTblname());

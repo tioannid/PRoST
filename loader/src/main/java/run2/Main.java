@@ -11,6 +11,10 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import loader2.configuration.TripleTableSchema;
+import org.apache.spark.serializer.KryoSerializer;
+import org.datasyslab.geosparksql.utils.GeoSparkSQLRegistrator;
+import org.datasyslab.geosparkviz.core.Serde.GeoSparkVizKryoRegistrator;
+import org.datasyslab.geosparkviz.sql.utils.GeoSparkVizRegistrator;
 
 /**
  * The Main class parses the CLI arguments and calls the executor.
@@ -144,13 +148,12 @@ public class Main {
                 "name of triple table output (only for tripleTable)");
         outputTripleTable.setRequired(false);
         options.addOption(outputTripleTable);
-        
+
         // tioa
         final Option hiveTableFormatOpt = new Option("tblfrm", "hiveTableFormat", true,
                 "Hive default table format.");
         hiveTableFormatOpt.setRequired(false);
         options.addOption(hiveTableFormatOpt);
-        
 
         final HelpFormatter formatter = new HelpFormatter();
         CommandLine cmd = null;
@@ -303,10 +306,16 @@ public class Main {
             }
         }
 
-        final SparkSession spark = SparkSession.builder().appName(appName)
+        final SparkSession spark = SparkSession.builder()
+                .appName(appName)
+                .config("spark.serializer", KryoSerializer.class.getName())
+                .config("spark.kryo.registrator", GeoSparkVizKryoRegistrator.class.getName())
                 .enableHiveSupport().getOrCreate();
+        GeoSparkSQLRegistrator.registerAll(spark);
+        GeoSparkVizRegistrator.registerAll(spark);
+
         spark.sql("SET hive.default.fileformat=" + hiveTableFormat);
-        
+
         long startTime;
         long executionTime;
 
