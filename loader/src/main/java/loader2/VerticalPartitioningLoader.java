@@ -15,7 +15,6 @@ import org.apache.spark.sql.SparkSession;
  */
 public class VerticalPartitioningLoader extends TripleTableLoader {
 
-
     // ----- DATA MEMBERS -----
     private boolean generateExtVP;
     private String dictionaryTable;
@@ -55,8 +54,8 @@ public class VerticalPartitioningLoader extends TripleTableLoader {
                         this.tttschema.getColname_subj(),
                         this.tttschema.getColname_obj(),
                         this.tttschema.getTblname())).cache();
- 
-        JavaPairRDD<Row,Long> indxRDD = propsDS.javaRDD().zipWithIndex().cache();
+
+        JavaPairRDD<Row, Long> indxRDD = propsDS.javaRDD().zipWithIndex().cache();
         JavaRDD<PredTbl> propsRDD = indxRDD.map(t -> new PredTbl(t._1().getString(0), "prop" + t._2(), t._1().getLong(1), t._1().getLong(2), t._1().getLong(3))).cache();
 //        StringBuilder sb = new StringBuilder();
 //        for (PredTbl predtbl: propsRDD.collect()) {
@@ -68,16 +67,22 @@ public class VerticalPartitioningLoader extends TripleTableLoader {
         Dataset<Row> predtblDS = spark.createDataFrame(propsRDD, PredTbl.class);
 //        predtblDS.createOrReplaceTempView("tmp");
 //        spark.sql("SELECT * FROM tmp").show();
-        predtblDS.write().saveAsTable(dictionaryTable);
-        
+        if (this.useHiveQL_TableCreation) { // use HiveQL
+            predtblDS.createOrReplaceTempView("tmp_propdict");
+            spark.sql(String.format(
+                    "CREATE TABLE %1$s AS SELECT * FROM tmp_propdict",
+                    dictionaryTable));
+        } else {    // use Spark SQL
+            predtblDS.write().saveAsTable(dictionaryTable);
+        }
         // 2.2. Create all property tables
         String createVPTable;
         for (PredTbl predtbl : this.predDictionary) {
             createVPTable = String.format(
-                "CREATE TABLE %1$s AS SELECT %2$s, %3$s FROM %4$s WHERE %5$s = '%6$s'", 
+                    "CREATE TABLE %1$s AS SELECT %2$s, %3$s FROM %4$s WHERE %5$s = '%6$s'",
                     predtbl.getTblName(), tttschema.getColname_subj(),
                     tttschema.getColname_obj(), tttschema.getTblname(),
-                    tttschema.getColname_pred(), predtbl.getPred());            
+                    tttschema.getColname_pred(), predtbl.getPred());
             spark.sql(createVPTable);
         }
     }
