@@ -51,8 +51,9 @@ public class NamespaceDictionary implements Serializable {
         this.nsList = prefixDS.collectAsList();
         if (this.useHiveQL_TableCreation) { // use HiveQL
             prefixDS.createOrReplaceTempView("tmp_nsprefixes");
-            spark.sql(String.format("CREATE TABLE %1$s(`namespace` string, `uri` string)", nsPrefTableName));
-            spark.sql(String.format("INSERT INTO %1$s SELECT * FROM tmp_nsprefixes", nsPrefTableName));
+//            spark.sql(String.format("CREATE TABLE %1$s(`namespace` string, `uri` string)", nsPrefTableName));
+//            spark.sql(String.format("INSERT INTO %1$s SELECT * FROM tmp_nsprefixes", nsPrefTableName));
+            spark.sql(String.format("CREATE TABLE %1$s AS SELECT * FROM tmp_nsprefixes", nsPrefTableName));
 //            spark.sql(String.format(
 //                    "CREATE TABLE %1$s AS SELECT * FROM tmp_nsprefixes",
 //                    nsPrefTableName));

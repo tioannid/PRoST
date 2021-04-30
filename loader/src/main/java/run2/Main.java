@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import loader2.configuration.TripleTableSchema;
+import loader2.utils.Utils;
 import org.apache.spark.serializer.KryoSerializer;
 import org.datasyslab.geosparksql.utils.GeoSparkSQLRegistrator;
 import org.datasyslab.geosparkviz.core.Serde.GeoSparkVizKryoRegistrator;
@@ -307,7 +308,7 @@ public class Main {
         }
 
         final SparkSession spark = SparkSession.builder()
-                .appName(appName)
+                .appName(appName + " - " + Utils.prettyPrint(args))
                 .config("spark.serializer", KryoSerializer.class.getName())
                 .config("spark.kryo.registrator", GeoSparkVizKryoRegistrator.class.getName())
                 .enableHiveSupport().getOrCreate();
