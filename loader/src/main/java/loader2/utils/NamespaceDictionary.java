@@ -54,9 +54,6 @@ public class NamespaceDictionary implements Serializable {
 //            spark.sql(String.format("CREATE TABLE %1$s(`namespace` string, `uri` string)", nsPrefTableName));
 //            spark.sql(String.format("INSERT INTO %1$s SELECT * FROM tmp_nsprefixes", nsPrefTableName));
             spark.sql(String.format("CREATE TABLE %1$s AS SELECT * FROM tmp_nsprefixes", nsPrefTableName));
-//            spark.sql(String.format(
-//                    "CREATE TABLE %1$s AS SELECT * FROM tmp_nsprefixes",
-//                    nsPrefTableName));
         } else {      // use Spark SQL
             prefixDS.write().saveAsTable(nsPrefTableName);
         }
