@@ -56,13 +56,13 @@ public class TripleTableLoader extends Loader implements Serializable {
 
     // The use of this method is ONLY for setting a different name for
     // the table to store the namespace prefixes BEFORE creating a
-    // new TripleTableLoader object. 
+    // new TripleTableLoader object.
     // TODO: It can be used to trigger the change of namespace prefixes table
     public static void setNsPrefTableName(String nsPrefTableName) {
         TripleTableLoader.nsPrefTableName = nsPrefTableName;
     }
 
-    // DATA MEMBERS    
+    // DATA MEMBERS
     protected boolean ttPartitionedBySub = false;
     protected boolean ttPartitionedByPred = false;
     protected boolean dropDuplicates = true;
@@ -75,6 +75,7 @@ public class TripleTableLoader extends Loader implements Serializable {
     protected String namespacePrefixJSONFile = "";
     protected NamespaceDictionary nsDict = null;
     protected AsWKTDictionary asWKTDict = null;
+    protected String hiveTableFormat;
 
     // CONSTRUCTORS
     // 1. Detailed/Base Constructor
@@ -87,7 +88,8 @@ public class TripleTableLoader extends Loader implements Serializable {
             TripleTableSchema tttschema, TripleTableSchema gttschema,
             String namespacePrefixJSONFile, boolean createUseNsDict,
             final boolean useHiveQL_TableCreation,
-            String asWKTFile) throws Exception {
+            String asWKTFile,
+            String hiveTableFormat) throws Exception {
         super(spark, dbName, flagDBExists, flagCreateDB, hdfsInputDir, useHiveQL_TableCreation);
         this.ttPartitionedBySub = ttPartitionedBySub;
         this.ttPartitionedByPred = ttPartitionedByPred;
@@ -96,13 +98,15 @@ public class TripleTableLoader extends Loader implements Serializable {
         this.gttschema = gttschema;
         this.createUseNsDict = createUseNsDict;
         this.namespacePrefixJSONFile = namespacePrefixJSONFile;
+        this.hiveTableFormat = hiveTableFormat;
         if (createUseNsDict) {
             nsDict = new NamespaceDictionary(spark, namespacePrefixJSONFile,
-                    nsPrefTableName, useHiveQL_TableCreation);
+                    nsPrefTableName, useHiveQL_TableCreation, hiveTableFormat);
         } else {
             nsDict = null;
         }
-        this.asWKTDict = new AsWKTDictionary(spark, asWKTFile, useHiveQL_TableCreation);
+        this.asWKTDict = new AsWKTDictionary(spark, asWKTFile,
+                useHiveQL_TableCreation, hiveTableFormat);
     }
 
     // DATA ACCESSORS
@@ -185,7 +189,7 @@ public class TripleTableLoader extends Loader implements Serializable {
             Namespace ns;
             int cntReplaced = 0, listlen = nsList.size(), i;
             String serializedRDF = rdf.serialize(), serializedRDF_;
-            // 
+            //
             for (i = 0; (i < listlen && (cntReplaced != 3)); i++) {
                 ns = nsList.get(i);
                 serializedRDF_ = serializedRDF.replaceAll(ns.getUri(), ns.getNamespace());
@@ -281,7 +285,7 @@ public class TripleTableLoader extends Loader implements Serializable {
             logger.error(e.getMessage());
         }
 
-        // get the list of geospatially indexed properties inferred from 
+        // get the list of geospatially indexed properties inferred from
         // n-triples files, update-merge in asWKTDict and persist it in Hive
         spatialPropsRDD = rdfRDD.flatMap(new GetSpatialProps()).distinct().cache();
         asWKTDict.persist(spatialPropsRDD.collect());
@@ -309,12 +313,38 @@ public class TripleTableLoader extends Loader implements Serializable {
                     "CREATE TABLE %1$s AS SELECT * FROM tmp_dictencoded",
                     tttschema.getTblname()));
             dictEncodedSpatialRdfDS.createOrReplaceTempView("tmp_dictencodedaswkt");
-            spark.sql(String.format(
-                    "CREATE TABLE %1$s AS SELECT s,p,o, ST_GeomFromWKT(o) AS bwkt FROM tmp_dictencodedaswkt",
-                    gttschema.getTblname()));
+            if (!ttPartitionedByPred) {
+                spark.sql(String.format(
+                        "CREATE TABLE %1$s AS SELECT s,p,o, ST_GeomFromWKT(o) AS bwkt FROM tmp_dictencodedaswkt",
+                        gttschema.getTblname()));
+            } else {
+                /* Have to create a managed table before INSERT-INTO-SELECT
+                ** to the final table !
+                 */
+                // Load from temporary view to intermediate table
+                spark.sql("CREATE TABLE g_triples_tmp AS SELECT s,p,o, ST_GeomFromWKT(o) AS bwkt FROM tmp_dictencodedaswkt");
+                // Create partitioned table
+                spark.sql(String.format(
+                        "CREATE TABLE %1$s(s string, o string, bwkt array<tinyint>) PARTITIONED BY (p string)",
+                        gttschema.getTblname()));
+                // Load from intermediate table to final table
+                spark.sql(String.format(
+                        "INSERT INTO TABLE %1$s PARTITION(p) SELECT s, o, bwkt, p FROM g_triples_tmp",
+                        gttschema.getTblname()));
+                // Calculate table statistics
+                spark.sql(String.format(
+                        "ANALYZE TABLE %1$s PARTITION(p) COMPUTE STATISTICS",
+                        gttschema.getTblname()));
+                // Drop intermediate table
+                spark.sql("DROP TABLE g_triples_tmp");
+            }
         } else {    // use Spark SQL
-            dictEncodedRdfDS.write().saveAsTable(tttschema.getTblname());
-            dictEncodedSpatialRdfDS.write().saveAsTable(gttschema.getTblname());
+            dictEncodedRdfDS.write().format(hiveTableFormat).saveAsTable(tttschema.getTblname());
+            if (!ttPartitionedByPred) {
+                dictEncodedSpatialRdfDS.write().format(hiveTableFormat).saveAsTable(gttschema.getTblname());
+            } else {
+                dictEncodedSpatialRdfDS.write().format(hiveTableFormat).partitionBy("p").saveAsTable(gttschema.getTblname());
+            }
         }
     }
 

@@ -25,23 +25,25 @@ public class AsWKTDictionary implements Serializable {
     private final String asWKTTableName;
     private final boolean useHiveQL_TableCreation;
     private final SparkSession spark;
+    private String hiveTableFormat;
 
     // ----- CONSTRUCTORS -----
     // 1. Detailed/Base Constructor
     /**
-     * Read from the HDFS {@link asWKTFile} the asWKT properties and load
-     * them to a list, while registering the name of the table where the
-     * list of asWKT properties will be persisted and whether HiveQL should
-     * be used for the creation.
-     * 
+     * Read from the HDFS {@link asWKTFile} the asWKT properties and load them
+     * to a list, while registering the name of the table where the list of
+     * asWKT properties will be persisted and whether HiveQL should be used for
+     * the creation.
+     *
      * @param spark
      * @param asWKTFile HDFS file with the asWKT properties to use for indexing
      * @param asWKTTableName the table where the asWKT properties will be stored
      * @param useHiveQL_TableCreation <tt>true</tt> if the should be created
-     *              with HiveQL, otherwise create it with Spark SQL
+     * with HiveQL, otherwise create it with Spark SQL
      */
     public AsWKTDictionary(SparkSession spark, String asWKTFile,
-            String asWKTTableName, boolean useHiveQL_TableCreation) {
+            String asWKTTableName, boolean useHiveQL_TableCreation,
+            String hiveTableFormat) {
         this.spark = spark;
         // read asWKT properties from asWKTFile HDFS file
         this.asWKTList = new ArrayList<>();
@@ -54,16 +56,19 @@ public class AsWKTDictionary implements Serializable {
         // update properties for future Hive table creation
         this.asWKTTableName = asWKTTableName;
         this.useHiveQL_TableCreation = useHiveQL_TableCreation;
+        this.hiveTableFormat = hiveTableFormat;
     }
 
     // 2. Constructor (with external file provided)
-    public AsWKTDictionary(SparkSession spark, String asWKTFile, boolean useHiveQL_TableCreation) {
-        this(spark, asWKTFile, "aswktprops", useHiveQL_TableCreation);
+    public AsWKTDictionary(SparkSession spark, String asWKTFile,
+            boolean useHiveQL_TableCreation, String hiveTableFormat) {
+        this(spark, asWKTFile, "aswktprops", useHiveQL_TableCreation, hiveTableFormat);
     }
 
     // 3. Constructor (no external file provided), just the GeoSPARQL standard asWKT property
-    public AsWKTDictionary(SparkSession spark, boolean useHiveQL_TableCreation) {
-        this(spark, "", "aswktprops", useHiveQL_TableCreation);
+    public AsWKTDictionary(SparkSession spark, boolean useHiveQL_TableCreation,
+            String hiveTableFormat) {
+        this(spark, "", "aswktprops", useHiveQL_TableCreation, hiveTableFormat);
     }
 
     // ----- DATA ACCESSORS -----
@@ -83,7 +88,7 @@ public class AsWKTDictionary implements Serializable {
                     "CREATE TABLE %1$s AS SELECT * FROM tmp_asWKT",
                     asWKTTableName));
         } else {    // use Spark SQL
-            asWKTDS.write().saveAsTable(asWKTTableName);
+            asWKTDS.write().format(hiveTableFormat).saveAsTable(asWKTTableName);
         }
     }
 }

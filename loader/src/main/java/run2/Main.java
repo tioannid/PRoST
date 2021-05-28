@@ -280,7 +280,7 @@ public class Main {
         }
         if (cmd.hasOption("ttPartitionedByPredicate")) {
             ttPartitionedByPred = true;
-            logger.info("Triple Table will be partitioned by predicate.");
+            logger.info("g_triple Table will be partitioned by predicate.");
         }
         if (cmd.hasOption("ttPartitionedBySub")) {
             ttPartitionedBySub = true;
@@ -316,6 +316,7 @@ public class Main {
         GeoSparkVizRegistrator.registerAll(spark);
 
         spark.sql("SET hive.default.fileformat=" + hiveTableFormat);
+        spark.sql("set hive.exec.dynamic.partition.mode=nonstrict");
 
         long startTime;
         long executionTime;
@@ -330,7 +331,8 @@ public class Main {
                             dropDuplicates, tttschema, gttschema,
                             namespacePrefixFile, nsPrefixDictEncode,
                             useHiveQL_TableCreation,
-                            asWKTFile);
+                            asWKTFile,
+                            hiveTableFormat);
             tt_loader.load();
             flagDBExists = tt_loader.isFlagDBExists();
             flagCreateDB = tt_loader.isFlagCreateDB();
@@ -370,7 +372,8 @@ public class Main {
                             namespacePrefixFile, nsPrefixDictEncode,
                             useHiveQL_TableCreation,
                             asWKTFile,
-                            dictionaryFile, generateExtVP, thresholdExtVP);
+                            dictionaryFile, generateExtVP, thresholdExtVP,
+                            hiveTableFormat);
             vp_loader.load();
             executionTime = System.currentTimeMillis() - startTime;
             logger.info("Time in ms to build the Vertical partitioning: " + String.valueOf(executionTime));

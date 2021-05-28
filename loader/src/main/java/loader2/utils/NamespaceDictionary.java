@@ -29,6 +29,7 @@ public class NamespaceDictionary implements Serializable {
     private final List<Namespace> nsList;
     private final String nsPrefTableName; // Hive table to store namespace prefixes
     protected boolean useHiveQL_TableCreation;
+    private final String hiveTableFormat;
 
     // ----- CONSTRUCTORS -----
     /**
@@ -42,11 +43,13 @@ public class NamespaceDictionary implements Serializable {
      * prefixes are to be stored
      */
     public NamespaceDictionary(SparkSession spark, String namespacePrefixFile,
-            String nsPrefTableName, boolean useHiveQL_TableCreation) {
+            String nsPrefTableName, boolean useHiveQL_TableCreation,
+            String hiveTableFormat) {
         this.spark = spark;
         this.namespacePrefixJSONFile = namespacePrefixFile;
         this.nsPrefTableName = nsPrefTableName;
         this.useHiveQL_TableCreation = useHiveQL_TableCreation;
+        this.hiveTableFormat = hiveTableFormat;
         Dataset<Namespace> prefixDS = spark.read().json(namespacePrefixFile).as(Namespace.Encoder);
         this.nsList = prefixDS.collectAsList();
         if (this.useHiveQL_TableCreation) { // use HiveQL
@@ -55,7 +58,7 @@ public class NamespaceDictionary implements Serializable {
 //            spark.sql(String.format("INSERT INTO %1$s SELECT * FROM tmp_nsprefixes", nsPrefTableName));
             spark.sql(String.format("CREATE TABLE %1$s AS SELECT * FROM tmp_nsprefixes", nsPrefTableName));
         } else {      // use Spark SQL
-            prefixDS.write().saveAsTable(nsPrefTableName);
+            prefixDS.write().format(this.hiveTableFormat).saveAsTable(nsPrefTableName);
         }
         cnt++; // increment the number of dictionaries created
     }
