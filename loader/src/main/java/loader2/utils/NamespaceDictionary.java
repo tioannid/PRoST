@@ -11,7 +11,7 @@ import run2.Main;
  *
  * @author tioannid
  */
-public class NamespaceDictionary implements Serializable  {
+public class NamespaceDictionary implements Serializable {
 
     // ----- STATIC MEMBERS -----
     protected static final Logger logger = Logger.getLogger(Main.appName);
@@ -28,26 +28,38 @@ public class NamespaceDictionary implements Serializable  {
     private final String namespacePrefixJSONFile;  // JSON file with namespace prefixes
     private final List<Namespace> nsList;
     private final String nsPrefTableName; // Hive table to store namespace prefixes
+    protected boolean useHiveQL_TableCreation;
+    private final String hiveTableFormat;
 
     // ----- CONSTRUCTORS -----
     /**
-     * Read from the HDFS JSON {@link namespacePrefixFile} the namespace prefixes
-     * and persisted them to the table {@link nsPrefTableName}
-     * 
+     * Read from the HDFS JSON {@link namespacePrefixFile} the namespace
+     * prefixes and persisted them to the table {@link nsPrefTableName}
+     *
      * @param spark
      * @param namespacePrefixFile A string representing the HDFS JSON file with
-     *          the namespace prefixes
+     * the namespace prefixes
      * @param nsPrefTableName A String with the table name where the namespace
-     *          prefixes are to be stored
+     * prefixes are to be stored
      */
     public NamespaceDictionary(SparkSession spark, String namespacePrefixFile,
-            String nsPrefTableName) {
+            String nsPrefTableName, boolean useHiveQL_TableCreation,
+            String hiveTableFormat) {
         this.spark = spark;
         this.namespacePrefixJSONFile = namespacePrefixFile;
         this.nsPrefTableName = nsPrefTableName;
+        this.useHiveQL_TableCreation = useHiveQL_TableCreation;
+        this.hiveTableFormat = hiveTableFormat;
         Dataset<Namespace> prefixDS = spark.read().json(namespacePrefixFile).as(Namespace.Encoder);
         this.nsList = prefixDS.collectAsList();
-        prefixDS.write().saveAsTable(nsPrefTableName);
+        if (this.useHiveQL_TableCreation) { // use HiveQL
+            prefixDS.createOrReplaceTempView("tmp_nsprefixes");
+//            spark.sql(String.format("CREATE TABLE %1$s(`namespace` string, `uri` string)", nsPrefTableName));
+//            spark.sql(String.format("INSERT INTO %1$s SELECT * FROM tmp_nsprefixes", nsPrefTableName));
+            spark.sql(String.format("CREATE TABLE %1$s AS SELECT * FROM tmp_nsprefixes", nsPrefTableName));
+        } else {      // use Spark SQL
+            prefixDS.write().format(this.hiveTableFormat).saveAsTable(nsPrefTableName);
+        }
         cnt++; // increment the number of dictionaries created
     }
 

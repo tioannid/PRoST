@@ -11,6 +11,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import loader2.configuration.TripleTableSchema;
+import loader2.utils.Utils;
+import org.apache.spark.serializer.KryoSerializer;
+import org.datasyslab.geosparksql.utils.GeoSparkSQLRegistrator;
+import org.datasyslab.geosparkviz.core.Serde.GeoSparkVizKryoRegistrator;
+import org.datasyslab.geosparkviz.sql.utils.GeoSparkVizRegistrator;
 
 /**
  * The Main class parses the CLI arguments and calls the executor.
@@ -144,13 +149,12 @@ public class Main {
                 "name of triple table output (only for tripleTable)");
         outputTripleTable.setRequired(false);
         options.addOption(outputTripleTable);
-        
+
         // tioa
         final Option hiveTableFormatOpt = new Option("tblfrm", "hiveTableFormat", true,
                 "Hive default table format.");
         hiveTableFormatOpt.setRequired(false);
         options.addOption(hiveTableFormatOpt);
-        
 
         final HelpFormatter formatter = new HelpFormatter();
         CommandLine cmd = null;
@@ -276,7 +280,7 @@ public class Main {
         }
         if (cmd.hasOption("ttPartitionedByPredicate")) {
             ttPartitionedByPred = true;
-            logger.info("Triple Table will be partitioned by predicate.");
+            logger.info("g_triple Table will be partitioned by predicate.");
         }
         if (cmd.hasOption("ttPartitionedBySub")) {
             ttPartitionedBySub = true;
@@ -303,10 +307,17 @@ public class Main {
             }
         }
 
-        final SparkSession spark = SparkSession.builder().appName(appName)
+        final SparkSession spark = SparkSession.builder()
+                .appName(appName + " - " + Utils.prettyPrint(args))
+                .config("spark.serializer", KryoSerializer.class.getName())
+                .config("spark.kryo.registrator", GeoSparkVizKryoRegistrator.class.getName())
                 .enableHiveSupport().getOrCreate();
+        GeoSparkSQLRegistrator.registerAll(spark);
+        GeoSparkVizRegistrator.registerAll(spark);
+
         spark.sql("SET hive.default.fileformat=" + hiveTableFormat);
-        
+        spark.sql("set hive.exec.dynamic.partition.mode=nonstrict");
+
         long startTime;
         long executionTime;
 
@@ -320,7 +331,8 @@ public class Main {
                             dropDuplicates, tttschema, gttschema,
                             namespacePrefixFile, nsPrefixDictEncode,
                             useHiveQL_TableCreation,
-                            asWKTFile);
+                            asWKTFile,
+                            hiveTableFormat);
             tt_loader.load();
             flagDBExists = tt_loader.isFlagDBExists();
             flagCreateDB = tt_loader.isFlagCreateDB();
@@ -360,7 +372,8 @@ public class Main {
                             namespacePrefixFile, nsPrefixDictEncode,
                             useHiveQL_TableCreation,
                             asWKTFile,
-                            dictionaryFile, generateExtVP, thresholdExtVP);
+                            dictionaryFile, generateExtVP, thresholdExtVP,
+                            hiveTableFormat);
             vp_loader.load();
             executionTime = System.currentTimeMillis() - startTime;
             logger.info("Time in ms to build the Vertical partitioning: " + String.valueOf(executionTime));

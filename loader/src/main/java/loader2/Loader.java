@@ -109,20 +109,4 @@ public abstract class Loader {
         spark.sql("USE " + dbName);
         logger.info("Using the database: " + dbName);
     }
-
-    public static HashMap<String, String> parseCSVDictionary(String fileName) throws FileNotFoundException, IOException {
-        FileSystem fs = FileSystem.get(new Configuration());
-        FSDataInputStream in = fs.open(new Path(fileName));
-        HashMap<String, String> map;
-        try (Scanner scanner = new Scanner(in)) {
-            scanner.useDelimiter(",");
-            map = new HashMap<>();
-            while (scanner.hasNext()) {
-                String key = scanner.next();
-                String value = scanner.next();
-                map.put(key, value);
-            }
-        }
-        return map;
-    }
 }

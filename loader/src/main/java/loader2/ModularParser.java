@@ -51,9 +51,23 @@ public class ModularParser extends NTriplesParser implements java.io.Serializabl
     }
 
     // ----- METHODS -----
-    RDFStatement parseLine(String line) throws RDFParseException, RDFHandlerException, IOException {
+//    RDFStatement parseLine(String line) throws RDFParseException, RDFHandlerException, IOException {
+//
+//        this.parse((InputStream) (new ByteArrayInputStream(line.getBytes(Charset.forName("UTF-8")))), "HELLO");
+//
+//        return this.rdf;
+//    }
+    RDFStatement parseLine(String line) {
 
-        this.parse((InputStream) (new ByteArrayInputStream(line.getBytes(Charset.forName("UTF-8")))), "HELLO");
+        try {
+            this.parse((InputStream) (new ByteArrayInputStream(line.getBytes(Charset.forName("UTF-8")))), "HELLO");
+        } catch (IOException ex) {
+            logger.error("DBG22-IOException in line\n" + line + "\n" + ex.getMessage());
+        } catch (RDFParseException ex) {
+            logger.error("DBG22-RDFParseException in line\n" + line + "\n" + ex.getMessage());
+        } catch (RDFHandlerException ex) {
+            logger.error("DBG22-RDFHandlerException in line\n" + line + "\n" + ex.getMessage());
+        }
 
         return this.rdf;
     }
